@@ -1291,6 +1291,7 @@
       Input.keyMapper[46] = "delete"; // Delete key
       Input.keyMapper[79] = "saveExport"; // O key
       Input.keyMapper[73] = "saveImport"; // I key
+      Input.keyMapper[80] = "saveExportGlobal"; // P key (Continue menu only)
     }
 
     // Mobile: enlarge command-window items so taps land easily.
@@ -1411,6 +1412,11 @@
           this._handleSaveImport(savefileId);
         } else if (Input.isTriggered("delete")) {
           this._handleSaveDelete(savefileId);
+        } else if (
+          this instanceof Scene_Load &&
+          Input.isTriggered("saveExportGlobal")
+        ) {
+          exportGlobalSave();
         }
       };
 
@@ -1427,6 +1433,15 @@
             { text: "[I] Import", key: "saveImport" },
             { text: "[Del] Delete", key: "delete" },
           ];
+          // Continue menu only: prepend a screen-level shortcut to export
+          // the active mod's (or base game's) global.rpgsave. Replaces the
+          // old hidden Title-screen 'O' shortcut.
+          if (this instanceof Scene_Load) {
+            labels.unshift({
+              text: "[P] Export global",
+              key: "saveExportGlobal",
+            });
+          }
           var separator = "   ";
           var pad = hw.standardPadding();
           hw.contents.fontSize = 16;
@@ -1482,6 +1497,7 @@
               if (rk === "saveExport") this._handleSaveExport(savefileId);
               else if (rk === "saveImport") this._handleSaveImport(savefileId);
               else if (rk === "delete") this._handleSaveDelete(savefileId);
+              else if (rk === "saveExportGlobal") exportGlobalSave();
               break;
             }
           }
@@ -2083,22 +2099,6 @@
       Scene_Title.prototype.commandMods = function () {
         this._commandWindow.close();
         SceneManager.push(Scene_Mods);
-      };
-
-      // O key on the title screen only: download the active mod's (or base
-      // game's) global.rpgsave. Same file format as Scene_File's per-slot
-      // export (LZString-compressed base64), so it round-trips via the
-      // desktop game's save folder.
-      var _orig_title_update = Scene_Title.prototype.update;
-      Scene_Title.prototype.update = function () {
-        _orig_title_update.call(this);
-        if (
-          typeof Input !== "undefined" &&
-          Input.isTriggered("saveExport") &&
-          SceneManager._scene === this
-        ) {
-          exportGlobalSave();
-        }
       };
     }
 

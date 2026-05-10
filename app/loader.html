@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>kidev's TCOAAL Browser Loader</title>
     <link rel="icon" id="favicon" href="/favicon.ico" type="image/x-icon" />
+    <script src="js/libs/pako_inflate.min.js"></script>
     <style>
       :root {
         --green: #86d37a;
@@ -164,15 +165,17 @@
         align-items: center;
         gap: 2vmax;
         padding: 3vmax;
-        /* Reserve space at the bottom for the absolutely-positioned
-           bottom-note so a tall error panel can scroll without colliding
-           with the steam widget. */
+
         padding-bottom: 220px;
         text-align: center;
         min-height: 100vh;
         justify-content: center;
         position: relative;
         overflow-y: auto;
+        transition: padding-bottom 0.4s ease;
+      }
+      .content.steam-hidden {
+        padding-bottom: 0;
       }
 
       .content h1 {
@@ -194,7 +197,7 @@
       .content .info {
         font-size: 0.9vmax;
         line-height: 1.65;
-        max-width: 500px;
+        /*max-width: 500px;*/
       }
 
       /* Hidden file input */
@@ -225,6 +228,10 @@
       .action-btn:disabled {
         opacity: 0.35;
         cursor: not-allowed;
+      }
+
+      .action-btn.loading-hidden {
+        display: none;
       }
 
       .action-btn.secondary {
@@ -330,30 +337,58 @@
         justify-content: center;
       }
 
-      /* Already-imported management panel (Play / Clear data / healthcheck) */
       .manage-panel {
         display: none;
         flex-direction: column;
         align-items: center;
         gap: 1.5vmax;
         max-width: 600px;
-        width: 90%;
+        /*width: 90%;*/
       }
       .manage-panel.visible {
         display: flex;
       }
       .manage-actions {
         display: flex;
-        gap: 1.2vmax;
-        flex-wrap: wrap;
-        justify-content: center;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1vmax;
+        width: 100%;
+        max-width: 480px;
       }
       .manage-actions .action-btn.play {
-        background: var(--purple);
-        color: var(--black);
+        background: #7a0a0a;
+        color: var(--white);
+        border: 3px solid var(--black);
+        font-size: 2.6vmax;
+        letter-spacing: 0.18em;
+        padding: 1vmax 2vmax;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+        box-shadow:
+          0 0 14px rgba(122, 10, 10, 0.5),
+          inset 0 0 18px rgba(0, 0, 0, 0.35);
       }
       .manage-actions .action-btn.play:hover:not(:disabled) {
-        filter: brightness(1.1);
+        background: #9a1414;
+        box-shadow:
+          0 0 22px rgba(154, 20, 20, 0.65),
+          inset 0 0 18px rgba(0, 0, 0, 0.35);
+      }
+      .reimport-row {
+        display: flex;
+        gap: 1vmax;
+        width: 100%;
+      }
+      .reimport-row .action-btn {
+        flex: 1;
+        min-width: 0;
+        font-size: 0.8vmax;
+        padding: 0.1vmax 1vmax;
+      }
+      .manage-actions .action-btn.export-saves {
+        width: 100%;
+        font-size: 0.8vmax;
+        padding: 0.1vmax 1vmax;
       }
 
       /* Healthcheck / missing-files report */
@@ -362,7 +397,7 @@
         flex-direction: column;
         gap: 0.7vmax;
         width: 100%;
-        padding: 1.2vmax 1.5vmax;
+        padding: 0.8vmax 0.5vmax;
         background: rgba(20, 20, 20, 0.85);
         border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 6px;
@@ -376,7 +411,16 @@
       .health-panel.ok {
         border-color: rgba(134, 211, 122, 0.5);
       }
+
+      .health-summary-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1vmax;
+        width: 100%;
+      }
       .health-summary {
+        flex: 1;
         font-size: 0.9vmax;
         color: rgba(255, 255, 255, 0.75);
       }
@@ -386,12 +430,20 @@
       .health-summary.warn {
         color: var(--yellow);
       }
+
+      .health-note {
+        font-size: 0.65vmax;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .health-note:empty {
+        display: none;
+      }
       .missing-list {
         display: none;
         max-height: 18vmax;
         overflow-y: auto;
         font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        font-size: 0.75vmax;
+        font-size: 0.5vmax;
         color: #c8a;
         background: rgba(0, 0, 0, 0.4);
         padding: 0.5vmax 0.7vmax;
@@ -403,7 +455,7 @@
         display: block;
       }
       .health-toggle {
-        font-size: 0.75vmax;
+        font-size: 0.5vmax;
         color: rgba(255, 255, 255, 0.55);
         cursor: pointer;
         text-decoration: underline;
@@ -412,6 +464,94 @@
         padding: 0;
         font-family: inherit;
         align-self: flex-start;
+      }
+
+      .action-btn.compact {
+        font-size: 0.8vmax;
+        padding: 0.35vmax 0.9vmax;
+        white-space: nowrap;
+        flex: 0 0 auto;
+      }
+      .action-btn.danger {
+        background: rgba(149, 84, 86, 0.22);
+        border: 1px solid rgba(149, 84, 86, 0.55);
+        color: #e7a8ab;
+      }
+      .action-btn.danger:hover:not(:disabled) {
+        background: rgba(149, 84, 86, 0.45);
+        color: var(--white);
+      }
+
+      .confirm-dialog {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.78);
+        z-index: 50;
+        justify-content: center;
+        align-items: center;
+        padding: 2vmax;
+        overflow-y: auto;
+      }
+      .confirm-dialog.visible {
+        display: flex;
+      }
+      .confirm-dialog-content {
+        background: var(--bg-color);
+        border: 1px solid rgba(149, 84, 86, 0.6);
+        border-radius: 8px;
+        padding: 2vmax 2.2vmax 1.6vmax;
+        max-width: 540px;
+        width: 100%;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+        display: flex;
+        flex-direction: column;
+        gap: 1vmax;
+      }
+      .confirm-dialog-content h2 {
+        color: var(--red);
+        font-size: 1.4vmax;
+        font-weight: normal;
+        text-align: center;
+        margin: 0;
+      }
+      .confirm-dialog-content p {
+        font-size: 0.95vmax;
+        line-height: 1.55;
+        text-align: center;
+        color: rgba(255, 255, 255, 0.85);
+        margin: 0;
+      }
+      .confirm-dialog-content p strong {
+        color: var(--yellow);
+      }
+      .confirm-saves-msg {
+        font-size: 0.85vmax;
+        text-align: center;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .confirm-saves-status {
+        font-size: 0.85vmax;
+        text-align: center;
+        min-height: 1em;
+        color: rgba(255, 255, 255, 0.6);
+      }
+      .confirm-saves-status.ok {
+        color: var(--green);
+      }
+      .confirm-saves-status.err {
+        color: var(--red);
+      }
+      .confirm-actions {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 0.8vmax;
+        margin-top: 0.4vmax;
+      }
+      .confirm-actions .action-btn {
+        font-size: 1vmax;
+        padding: 0.6vmax 1.4vmax;
       }
 
       /* Bottom note + Steam widget */
@@ -428,12 +568,18 @@
         transform: translateX(-50%);
         font-style: italic;
         z-index: 5;
+        transition: opacity 0.4s ease;
       }
 
       #steam-buy-frame {
         border: 0;
         z-index: 100;
         margin: 0;
+      }
+
+      .bottom-note.steam-hidden {
+        opacity: 0;
+        pointer-events: none;
       }
     </style>
   </head>
@@ -454,7 +600,7 @@
         <span style="font-size: 1vmax">TCOAAL Creator Tools</span>
       </a>
       <a
-        href="https://github.com/Kidev"
+        href="https://github.com/Kidev/TCOAALBrowserLoader"
         target="_blank"
         rel="noopener"
         class="github-link"
@@ -475,35 +621,66 @@
         -->
 
         <input type="file" id="file-input" webkitdirectory hidden />
+        <input
+          type="file"
+          id="zip-input"
+          accept=".zip,application/zip,application/x-zip-compressed"
+          hidden
+        />
 
         <button class="action-btn" id="btn-load" onclick="loadGameFiles()">
-          Import Game
+          Import Folder
+        </button>
+        <button
+          class="action-btn secondary"
+          id="btn-load-zip"
+          onclick="loadGameZip()"
+        >
+          Import as .zip file
         </button>
 
-        <!-- Already-imported management panel: Play / Clear data + healthcheck.
-             Hidden by default; revealed on init when IDB already has assets. -->
         <div class="manage-panel" id="manage-panel">
           <div class="manage-actions">
             <button class="action-btn play" id="btn-play" onclick="goToGame()">
-              Play
+              PLAY
             </button>
+            <div class="reimport-row">
+              <button
+                class="action-btn"
+                id="btn-reimport"
+                onclick="loadGameFiles()"
+              >
+                Re-import folder
+              </button>
+              <button
+                class="action-btn"
+                id="btn-reimport-zip"
+                onclick="loadGameZip()"
+              >
+                Re-import .zip
+              </button>
+            </div>
             <button
-              class="action-btn secondary"
-              id="btn-clear"
-              onclick="clearAndReimport()"
+              class="action-btn export-saves"
+              id="btn-export-saves"
+              onclick="downloadSavesZip()"
+              style="display: none"
             >
-              Clear data
-            </button>
-            <button
-              class="action-btn secondary"
-              id="btn-reimport"
-              onclick="loadGameFiles()"
-            >
-              Re-import
+              Export save files
             </button>
           </div>
           <div class="health-panel" id="health-panel">
-            <div class="health-summary" id="health-summary">Scanning...</div>
+            <div class="health-summary-row">
+              <div class="health-summary" id="health-summary">Scanning...</div>
+              <button
+                class="action-btn compact danger"
+                id="btn-clear"
+                onclick="askClearAll()"
+              >
+                Clear data
+              </button>
+            </div>
+            <div class="health-note" id="health-note"></div>
             <button
               class="health-toggle"
               id="health-toggle"
@@ -513,6 +690,43 @@
               Show missing files
             </button>
             <div class="missing-list" id="missing-list"></div>
+          </div>
+        </div>
+
+        <!-- Destructive confirmation: shown when user clicks "Clear data". -->
+        <div class="confirm-dialog" id="confirm-dialog">
+          <div class="confirm-dialog-content">
+            <h2>Clear all game data?</h2>
+            <p>
+              This will erase the imported game files
+              <strong>and your save files</strong> from this browser.
+              This cannot be undone.
+            </p>
+            <p class="confirm-saves-msg" id="confirm-saves-msg"></p>
+            <p class="confirm-saves-status" id="confirm-saves-status"></p>
+            <div class="confirm-actions">
+              <button
+                class="action-btn"
+                id="btn-confirm-download"
+                onclick="downloadSavesZip()"
+              >
+                Download saves (.zip)
+              </button>
+              <button
+                class="action-btn danger"
+                id="btn-confirm-wipe"
+                onclick="confirmClearAll()"
+              >
+                Wipe everything
+              </button>
+              <button
+                class="action-btn secondary"
+                id="btn-confirm-cancel"
+                onclick="hideConfirmClearDialog()"
+              >
+                Cancel
+              </button>
+            </div>
           </div>
         </div>
 
@@ -536,7 +750,8 @@
         </div>
 
         <p class="info" id="info-fresh">
-          Load your owned copy of the game into this browser.<br />
+          Load your owned copy of the game into this browser, either as a
+          folder or as a .zip archive.<br />
           Your files stay on your device and are never uploaded anywhere.
         </p>
 
@@ -635,7 +850,7 @@
               "blocked storage will prevent the game from loading.",
             err.message,
           );
-          $load.disabled = false;
+          setImportButtonsDisabled(false);
           return false;
         }
 
@@ -647,7 +862,7 @@
               "(the one named after the game, or its `www` " +
               "subfolder).",
           );
-          $load.disabled = false;
+          setImportButtonsDisabled(false);
           return false;
         }
         setStatus(`Loading 0 / ${total} files...`);
@@ -711,7 +926,7 @@
               "(the one named after the game) or its `www` subfolder.",
             "Missing:\n" + labels,
           );
-          $load.disabled = false;
+          setImportButtonsDisabled(false);
           return false;
         }
 
@@ -741,7 +956,7 @@
             "The CLD file was found but couldn't be decoded. The import " +
               "is incomplete. Clear and try again.",
           );
-          $load.disabled = false;
+          setImportButtonsDisabled(false);
           return false;
         }
         setStatus("Registering service worker...", "ok");
@@ -827,11 +1042,13 @@
 
         const total = manifest.files.length;
         const found = total - missing.length;
+        const percent =
+          total > 0 ? Math.floor((found / total) * 1000) / 10 : 100;
         return {
           total: total,
           found: found,
           missing: missing,
-          percent: total > 0 ? Math.round((found / total) * 100) : 100,
+          percent: percent,
         };
       }
 
@@ -839,6 +1056,7 @@
       function renderHealthcheck(health) {
         const $hp = document.getElementById("health-panel");
         const $sum = document.getElementById("health-summary");
+        const $note = document.getElementById("health-note");
         const $tog = document.getElementById("health-toggle");
         const $list = document.getElementById("missing-list");
         if (!$hp) return;
@@ -846,6 +1064,7 @@
         $hp.classList.add("visible");
         $hp.classList.remove("ok", "warn");
         $sum.classList.remove("ok", "warn");
+        if ($note) $note.textContent = "";
 
         if (!health) {
           $sum.textContent =
@@ -857,20 +1076,30 @@
         if (health.missing.length === 0) {
           $hp.classList.add("ok");
           $sum.classList.add("ok");
-          $sum.textContent = "All " + health.total + " expected files present.";
+          $sum.textContent = "All expected files are present";
           $tog.style.display = "none";
           $list.classList.remove("visible");
           return;
         }
         $hp.classList.add("warn");
         $sum.classList.add("warn");
+        const files = health.missing.length === 1 ? "file" : "files";
+        /*$sum.textContent =
+          health.missing.length +
+          " " +
+          files +
+          " missing (" +
+          health.percent.toFixed(1) +
+          "% present).";*/
         $sum.textContent =
           health.missing.length +
-          " file(s) missing out of " +
-          health.total +
-          " (" +
-          health.percent +
-          "% present). The game may still run; mods or version drift can cause this.";
+          " " +
+          files +
+          " missing";
+        if ($note) {
+          $note.textContent =
+            "The game might still run (game updates can cause this).";
+        }
         $list.textContent = health.missing.join("\n");
         $tog.style.display = "";
         $tog.textContent = "Show missing files (" + health.missing.length + ")";
@@ -896,7 +1125,9 @@
         const $info = document.getElementById("info-fresh");
         if ($info) $info.style.display = "none";
         if ($load) $load.style.display = "none";
+        if ($loadZip) $loadZip.style.display = "none";
         if ($managePanel) $managePanel.classList.add("visible");
+        updateExportSavesButton();
         renderHealthcheck(health);
       }
 
@@ -1028,20 +1259,26 @@
         return true;
       }
 
-      // UI helpers
-      // Declared with `var` so the inline onclick handlers (loadGameFiles,
-      // dismissError) can reference them no matter where in the script
-      // they're invoked from: `const` puts them in a temporal dead zone
-      // until execution reaches this point.
-
       var $bar = document.getElementById("bar");
       var $status = document.getElementById("status");
       var $wrap = document.getElementById("progress-wrap");
       var $load = document.getElementById("btn-load");
+      var $loadZip = document.getElementById("btn-load-zip");
       var $err = document.getElementById("error-panel");
       var $errTitle = document.getElementById("error-title");
       var $errBody = document.getElementById("error-body");
       var $errDetail = document.getElementById("error-detail");
+
+      function setImportButtonsDisabled(disabled) {
+        if ($load) {
+          $load.disabled = disabled;
+          $load.classList.toggle("loading-hidden", disabled);
+        }
+        if ($loadZip) {
+          $loadZip.disabled = disabled;
+          $loadZip.classList.toggle("loading-hidden", disabled);
+        }
+      }
 
       function showProgress(visible) {
         $wrap.classList.toggle("visible", visible);
@@ -1073,7 +1310,7 @@
 
       function dismissError() {
         $err.classList.remove("visible");
-        $load.disabled = false;
+        setImportButtonsDisabled(false);
       }
 
       // Hard reset: drop everything we persisted and reload into the
@@ -1139,6 +1376,7 @@
         }
         await dropDb("tcoaal");
         await dropDb("tcoaal-saves");
+        await dropDb("tcoaal-translations");
 
         location.replace("/loader.html");
       }
@@ -1175,6 +1413,242 @@
         document.getElementById("file-input").click();
       }
 
+      function loadGameZip() {
+        dismissError();
+        document.getElementById("zip-input").click();
+      }
+
+      // Minimal ZIP reader.
+      //
+      // Supports STORED (method 0) and DEFLATE (method 8, via pako.inflateRaw)
+      // the only methods produced by every common archiver (Windows
+      // built-in, macOS Archive Utility, 7-Zip default, Linux `zip`).
+      // ZIP64 archives are detected and rejected with a clear message.
+      //
+      // We parse the End-of-Central-Directory record, walk the central
+      // directory, and return per-entry descriptors. Decompression is
+      // deferred (lazy) so we don't materialise every entry's bytes
+      // upfront:  storeFiles() iterates sequentially and frees each
+      // buffer after putAsset.
+      var ZIP_EOCD_SIG = 0x06054b50;
+      var ZIP_CD_SIG = 0x02014b50;
+      var ZIP_LFH_SIG = 0x04034b50;
+      var ZIP_ZIP64_EOCD_SIG = 0x06064b50;
+      var ZIP_MAX_COMMENT = 65535;
+
+      function findEOCD(view, len) {
+        const minStart = Math.max(0, len - 22 - ZIP_MAX_COMMENT);
+        for (let i = len - 22; i >= minStart; i--) {
+          if (view.getUint32(i, true) === ZIP_EOCD_SIG) return i;
+        }
+        return -1;
+      }
+
+      function parseZip(buffer) {
+        const view = new DataView(buffer);
+        const bytes = new Uint8Array(buffer);
+        const len = bytes.length;
+        if (len < 22) throw new Error("File is too small to be a ZIP archive.");
+
+        const eocdOffset = findEOCD(view, len);
+        if (eocdOffset < 0) {
+          throw new Error(
+            "Not a valid ZIP file (end-of-archive marker not found).",
+          );
+        }
+
+        const numEntries = view.getUint16(eocdOffset + 10, true);
+        const cdSize = view.getUint32(eocdOffset + 12, true);
+        const cdOffset = view.getUint32(eocdOffset + 16, true);
+
+        if (
+          cdOffset === 0xffffffff ||
+          cdSize === 0xffffffff ||
+          numEntries === 0xffff
+        ) {
+          throw new Error(
+            "ZIP64 archives are not supported. Re-create the archive in a smaller, " +
+              "non-ZIP64 format, or import the game as a folder instead.",
+          );
+        }
+
+        // Filename decoder:  assume UTF-8 (modern archivers use the bit-11
+        // flag for UTF-8; older archivers default to CP437 but UTF-8 is a
+        // safe superset for ASCII paths, which TCOAAL filenames are).
+        const decoder = new TextDecoder("utf-8", { fatal: false });
+
+        const entries = [];
+        let p = cdOffset;
+        for (let i = 0; i < numEntries; i++) {
+          if (p + 46 > len || view.getUint32(p, true) !== ZIP_CD_SIG) {
+            throw new Error("Corrupt ZIP central directory.");
+          }
+          const compMethod = view.getUint16(p + 10, true);
+          const compSize = view.getUint32(p + 20, true);
+          const uncompSize = view.getUint32(p + 24, true);
+          const nameLen = view.getUint16(p + 28, true);
+          const extraLen = view.getUint16(p + 30, true);
+          const commentLen = view.getUint16(p + 32, true);
+          const localHdrOffset = view.getUint32(p + 42, true);
+          const name = decoder.decode(
+            bytes.subarray(p + 46, p + 46 + nameLen),
+          );
+          if (
+            compSize === 0xffffffff ||
+            uncompSize === 0xffffffff ||
+            localHdrOffset === 0xffffffff
+          ) {
+            throw new Error(
+              "ZIP64 entry detected (" +
+                name +
+                "). ZIP64 archives are not supported.",
+            );
+          }
+          entries.push({
+            name: name,
+            compMethod: compMethod,
+            compSize: compSize,
+            uncompSize: uncompSize,
+            localHdrOffset: localHdrOffset,
+          });
+          p += 46 + nameLen + extraLen + commentLen;
+        }
+        return entries;
+      }
+
+      // Materialise a single ZIP entry into a fresh ArrayBuffer.
+      function readZipEntry(buffer, entry) {
+        const view = new DataView(buffer);
+        const bytes = new Uint8Array(buffer);
+        const off = entry.localHdrOffset;
+        if (off + 30 > bytes.length || view.getUint32(off, true) !== ZIP_LFH_SIG) {
+          throw new Error(
+            "Corrupt ZIP local header for " + entry.name + ".",
+          );
+        }
+        // Local header has its own name/extra lengths:  they CAN differ
+        // from the central directory copy (extra fields often do), so we
+        // read them again here.
+        const lfhNameLen = view.getUint16(off + 26, true);
+        const lfhExtraLen = view.getUint16(off + 28, true);
+        const dataOff = off + 30 + lfhNameLen + lfhExtraLen;
+        const compressed = bytes.subarray(dataOff, dataOff + entry.compSize);
+
+        if (entry.compMethod === 0) {
+          // STORED: copy out of the parent ArrayBuffer so the IDB put
+          // doesn't pin the entire ZIP buffer in memory via subarray.
+          const out = new Uint8Array(entry.compSize);
+          out.set(compressed);
+          return out.buffer;
+        }
+        if (entry.compMethod === 8) {
+          if (typeof pako === "undefined" || !pako.inflateRaw) {
+            throw new Error("pako.inflateRaw is unavailable; cannot decompress DEFLATE.");
+          }
+          const out = pako.inflateRaw(compressed);
+          return out.buffer;
+        }
+        throw new Error(
+          "Unsupported ZIP compression method " +
+            entry.compMethod +
+            " for " +
+            entry.name +
+            ". Only STORED and DEFLATE are supported.",
+        );
+      }
+
+      // Translate ZIP central-directory entries into the same
+      // {path, getBuffer} shape as the folder import. Mirrors the folder
+      // path rules:
+      //   1. If every file shares a common top-level directory, strip it
+      //      (handles archives like "Coffin/www/...").
+      //   2. If the result starts with "www/", strip that too.
+      // Directory entries (name ends with "/") and entries that resolve
+      // to an empty path are dropped.
+      function zipEntriesToImports(buffer, entries) {
+        const fileEntries = entries.filter(
+          (e) => e.name.length > 0 && !e.name.endsWith("/"),
+        );
+        if (fileEntries.length === 0) return [];
+
+        const firstParts = new Set();
+        for (const e of fileEntries) {
+          const slash = e.name.indexOf("/");
+          firstParts.add(slash > 0 ? e.name.substring(0, slash) : "");
+        }
+
+        let stripPrefix = "";
+        if (firstParts.size === 1) {
+          const only = firstParts.values().next().value;
+          if (only) stripPrefix = only + "/";
+        }
+
+        const out = [];
+        for (const e of fileEntries) {
+          let p = e.name;
+          if (stripPrefix && p.startsWith(stripPrefix)) {
+            p = p.substring(stripPrefix.length);
+          }
+          if (p.startsWith("www/")) p = p.substring(4);
+          if (!p || p.endsWith("/")) continue;
+          out.push({
+            path: p,
+            getBuffer: async () => readZipEntry(buffer, e),
+          });
+        }
+        return out;
+      }
+
+      async function onZipInputChange(e) {
+        const file = e.target.files && e.target.files[0];
+        // Reset so picking the same file again re-fires the change event.
+        e.target.value = "";
+        if (!file) {
+          showError(
+            "No file selected",
+            "Pick a .zip archive of the game (the one named after " +
+              "the game, or one whose contents are the game's `www` folder).",
+          );
+          return;
+        }
+
+        setImportButtonsDisabled(true);
+        const $managePanel = document.getElementById("manage-panel");
+        if ($managePanel) $managePanel.classList.remove("visible");
+        showProgress(true);
+        setStatus("Reading archive...");
+
+        let imports;
+        try {
+          const buffer = await file.arrayBuffer();
+          const entries = parseZip(buffer);
+          imports = zipEntriesToImports(buffer, entries);
+        } catch (err) {
+          console.error("[loader] ZIP parse failed:", err);
+          showError(
+            "Couldn't read .zip file",
+            "The selected file isn't a valid ZIP archive, or it uses an " +
+              "unsupported feature.",
+            err && err.message ? err.message : String(err),
+          );
+          setImportButtonsDisabled(false);
+          return;
+        }
+
+        try {
+          await storeFiles(imports);
+        } catch (err) {
+          console.error("[loader] Import failed:", err);
+          showError(
+            "Import failed",
+            "Something went wrong while importing. Try again, or " +
+              "clear data and re-import.",
+            err && err.message ? err.message : String(err),
+          );
+          setImportButtonsDisabled(false);
+        }
+      }
+
       /**
        * Handler for the hidden <input type="file" webkitdirectory> fallback.
        * webkitRelativePath looks like "www/data/be1a37535e921f91"; we strip the
@@ -1191,7 +1665,7 @@
           return;
         }
 
-        $load.disabled = true;
+        setImportButtonsDisabled(true);
         // Re-import from manage UI: hide manage panel so the progress bar
         // is visible and the page doesn't read as both states at once.
         const $managePanel = document.getElementById("manage-panel");
@@ -1219,7 +1693,7 @@
               "clear data and re-import.",
             err && err.message ? err.message : String(err),
           );
-          $load.disabled = false;
+          setImportButtonsDisabled(false);
         }
       }
 
@@ -1239,9 +1713,45 @@
         window.location.href = "/index.html";
       }
 
-      // "Clear data": wipe IDB/SW/caches and stay on the loader so the
-      // user can re-import. Mirrors resetAndRetry but stays on /loader.html.
-      async function clearAndReimport() {
+      // "Clear data" (button) -> open the destructive confirmation
+      // dialog. The actual wipe happens in performClearAndReimport(),
+      // called by the dialog's "Wipe everything" button.
+      function askClearAll() {
+        const $d = document.getElementById("confirm-dialog");
+        const $msg = document.getElementById("confirm-saves-msg");
+        const $status = document.getElementById("confirm-saves-status");
+        if ($status) {
+          $status.textContent = "";
+          $status.className = "confirm-saves-status";
+        }
+        const saves = collectSaveEntries();
+        if ($msg) {
+          $msg.textContent =
+            saves.length === 0
+              ? "No save files were detected in this browser."
+              : saves.length +
+                " save file" +
+                (saves.length === 1 ? "" : "s") +
+                " detected. Back them up first if you want to keep them.";
+        }
+        const $download = document.getElementById("btn-confirm-download");
+        if ($download) $download.disabled = saves.length === 0;
+        if ($d) $d.classList.add("visible");
+      }
+
+      function hideConfirmClearDialog() {
+        const $d = document.getElementById("confirm-dialog");
+        if ($d) $d.classList.remove("visible");
+      }
+
+      function confirmClearAll() {
+        hideConfirmClearDialog();
+        performClearAndReimport();
+      }
+
+      // Wipe IDB/SW/caches/localStorage and reload into a fresh loader.
+      // Mirrors resetAndRetry but stays on /loader.html.
+      async function performClearAndReimport() {
         const $btnClear = document.getElementById("btn-clear");
         if ($btnClear) {
           $btnClear.disabled = true;
@@ -1278,8 +1788,249 @@
         }
         await dropDb("tcoaal");
         await dropDb("tcoaal-saves");
+        await dropDb("tcoaal-translations");
 
         location.replace("/loader.html");
+      }
+
+      // Save export
+      //
+      // RPG Maker MV writes saves to localStorage under the keys
+      // "RPG File<n>", "RPG Global", "RPG Config". When a mod is active
+      // StorageManager.webStorageKey prefixes them with "<modId>:" so
+      // saves are isolated per mod (see lang-shim.js). Match both forms.
+      var SAVE_KEY_RE = /(?:^|:)RPG (?:File\d+|Global|Config)$/;
+
+      // Show/hide the "Export save files" button in the manage panel
+      // based on whether any saves currently exist in localStorage.
+      function updateExportSavesButton() {
+        const $btn = document.getElementById("btn-export-saves");
+        if (!$btn) return;
+        $btn.style.display =
+          collectSaveEntries().length > 0 ? "" : "none";
+      }
+
+      function collectSaveEntries() {
+        const out = [];
+        let n;
+        try {
+          n = localStorage.length;
+        } catch (e) {
+          return out;
+        }
+        for (let i = 0; i < n; i++) {
+          let key;
+          try {
+            key = localStorage.key(i);
+          } catch (e) {
+            continue;
+          }
+          if (!key || !SAVE_KEY_RE.test(key)) continue;
+          let value;
+          try {
+            value = localStorage.getItem(key);
+          } catch (e) {
+            continue;
+          }
+          if (value == null) continue;
+          out.push({ key: key, value: value });
+        }
+        return out;
+      }
+
+      // CRC32 (IEEE 802.3 polynomial):  required by the ZIP file format
+      // for every entry, even STORED ones.
+      var CRC_TABLE = (function () {
+        const t = new Uint32Array(256);
+        for (let n = 0; n < 256; n++) {
+          let c = n;
+          for (let k = 0; k < 8; k++) {
+            c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+          }
+          t[n] = c >>> 0;
+        }
+        return t;
+      })();
+
+      function crc32(bytes) {
+        let c = 0xffffffff;
+        for (let i = 0; i < bytes.length; i++) {
+          c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
+        }
+        return (c ^ 0xffffffff) >>> 0;
+      }
+
+      // Build a ZIP archive in memory. STORED-only (no compression):
+      // saves are tiny LZString-compressed strings, so the cost of
+      // wiring up DEFLATE-write isn't worth it. Returns Uint8Array.
+      function buildZip(files) {
+        const encoder = new TextEncoder();
+        const local = [];
+        const cd = [];
+        let offset = 0;
+
+        for (const f of files) {
+          const nameBytes = encoder.encode(f.name);
+          const data = f.data;
+          const crc = crc32(data);
+          const size = data.length;
+
+          const lfh = new Uint8Array(30);
+          const lv = new DataView(lfh.buffer);
+          lv.setUint32(0, 0x04034b50, true);
+          lv.setUint16(4, 20, true); // version needed
+          lv.setUint16(6, 0x0800, true); // flags: bit 11 = UTF-8 filename
+          lv.setUint16(8, 0, true); // method: STORED
+          lv.setUint16(10, 0, true); // mod time
+          lv.setUint16(12, 0, true); // mod date
+          lv.setUint32(14, crc, true);
+          lv.setUint32(18, size, true); // compressed size
+          lv.setUint32(22, size, true); // uncompressed size
+          lv.setUint16(26, nameBytes.length, true);
+          lv.setUint16(28, 0, true); // extra length
+          local.push(lfh, nameBytes, data);
+
+          const cdr = new Uint8Array(46);
+          const cv = new DataView(cdr.buffer);
+          cv.setUint32(0, 0x02014b50, true);
+          cv.setUint16(4, 20, true); // version made by
+          cv.setUint16(6, 20, true); // version needed
+          cv.setUint16(8, 0x0800, true); // flags
+          cv.setUint16(10, 0, true); // method
+          cv.setUint16(12, 0, true);
+          cv.setUint16(14, 0, true);
+          cv.setUint32(16, crc, true);
+          cv.setUint32(20, size, true);
+          cv.setUint32(24, size, true);
+          cv.setUint16(28, nameBytes.length, true);
+          cv.setUint16(30, 0, true); // extra length
+          cv.setUint16(32, 0, true); // comment length
+          cv.setUint16(34, 0, true); // disk start
+          cv.setUint16(36, 0, true); // internal attrs
+          cv.setUint32(38, 0, true); // external attrs
+          cv.setUint32(42, offset, true); // local header offset
+          cd.push(cdr, nameBytes);
+
+          offset += 30 + nameBytes.length + size;
+        }
+
+        const cdSize = cd.reduce((a, b) => a + b.length, 0);
+        const cdOffset = offset;
+
+        const eocd = new Uint8Array(22);
+        const ev = new DataView(eocd.buffer);
+        ev.setUint32(0, 0x06054b50, true);
+        ev.setUint16(4, 0, true);
+        ev.setUint16(6, 0, true);
+        ev.setUint16(8, files.length, true);
+        ev.setUint16(10, files.length, true);
+        ev.setUint32(12, cdSize, true);
+        ev.setUint32(16, cdOffset, true);
+        ev.setUint16(20, 0, true);
+
+        const total = offset + cdSize + 22;
+        const out = new Uint8Array(total);
+        let p = 0;
+        for (const c of local) {
+          out.set(c, p);
+          p += c.length;
+        }
+        for (const c of cd) {
+          out.set(c, p);
+          p += c.length;
+        }
+        out.set(eocd, p);
+        return out;
+      }
+
+      // Translate a localStorage save key into its archive path.
+      //   "RPG File1"           -> "file1.rpgsave"
+      //   "RPG Global"          -> "global.rpgsave"
+      //   "RPG Config"          -> "config.rpgsave"
+      //   "TCOAAR:RPG File1"    -> "TCOAAR/file1.rpgsave"
+      //   "TCOAAR:RPG Global"   -> "TCOAAR/global.rpgsave"
+      // Base game saves live at the archive root; mod saves live in a
+      // sub-folder named after the mod, so unzipping yields a clean tree.
+      function saveBackupFilename(key) {
+        const colonIdx = key.indexOf(":");
+        // Sanitize the mod id of any path-unsafe characters so a
+        // hostile or malformed prefix can't escape the archive root.
+        const modDir =
+          colonIdx > 0
+            ? key.substring(0, colonIdx).replace(/[/\\:]/g, "_") + "/"
+            : "";
+        const rest = colonIdx > 0 ? key.substring(colonIdx + 1) : key;
+        const m = rest.match(/^RPG (File\d+|Global|Config)$/);
+        if (m) return modDir + m[1].toLowerCase() + ".rpgsave";
+        // Fallback for any unexpected save-shaped key.
+        return modDir + rest.replace(/[/\\:\s]/g, "_") + ".rpgsave";
+      }
+
+      // Trigger a browser download of the user's saves as a .zip.
+      // Each entry is the raw localStorage value (LZString-compressed
+      // RPG Maker save text) under its canonical .rpgsave filename, so
+      // the contents are interchangeable with native RPG Maker MV saves.
+      function downloadSavesZip() {
+        const $status = document.getElementById("confirm-saves-status");
+        const saves = collectSaveEntries();
+        if (saves.length === 0) {
+          if ($status) {
+            $status.textContent = "No saves to back up.";
+            $status.className = "confirm-saves-status err";
+          }
+          return;
+        }
+        try {
+          const encoder = new TextEncoder();
+          const files = saves.map((s) => ({
+            name: saveBackupFilename(s.key),
+            data: encoder.encode(s.value),
+          }));
+
+          const zip = buildZip(files);
+          // Local-time date + hour (HHhMM):  sortable, unambiguous,
+          // and safe on all OSes (no colons, no dots).
+          const d = new Date();
+          const pad = (n) => String(n).padStart(2, "0");
+          const ts =
+            d.getFullYear() +
+            "-" +
+            pad(d.getMonth() + 1) +
+            "-" +
+            pad(d.getDate()) +
+            "-" +
+            pad(d.getHours()) +
+            "h" +
+            pad(d.getMinutes());
+          const blob = new Blob([zip], { type: "application/zip" });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "TCOAAL-saves-" + ts + ".zip";
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          // Revoke after a delay: some browsers race the download
+          // dispatch with synchronous revocation.
+          setTimeout(() => URL.revokeObjectURL(url), 30000);
+
+          if ($status) {
+            $status.textContent =
+              "Backed up " +
+              saves.length +
+              " save file" +
+              (saves.length === 1 ? "" : "s") +
+              ". Safe to wipe.";
+            $status.className = "confirm-saves-status ok";
+          }
+        } catch (err) {
+          console.error("[loader] Save export failed:", err);
+          if ($status) {
+            $status.textContent =
+              "Save backup failed: " + (err.message || String(err));
+            $status.className = "confirm-saves-status err";
+          }
+        }
       }
 
       // Init: dual-mode UI.
@@ -1296,6 +2047,69 @@
         document
           .getElementById("file-input")
           .addEventListener("change", onFileInputChange);
+        document
+          .getElementById("zip-input")
+          .addEventListener("change", onZipInputChange);
+
+        const $confirm = document.getElementById("confirm-dialog");
+        if ($confirm) {
+          $confirm.addEventListener("click", (e) => {
+            if (e.target === $confirm) hideConfirmClearDialog();
+          });
+        }
+        document.addEventListener("keydown", (e) => {
+          if (
+            e.key === "Escape" &&
+            $confirm &&
+            $confirm.classList.contains("visible")
+          ) {
+            hideConfirmClearDialog();
+          }
+        });
+
+        // Steam-iframe overlap watcher.
+        (function watchSteamOverlap() {
+          const content = document.querySelector(".content");
+          const note = document.querySelector(".bottom-note");
+          if (!content || !note) return;
+
+          let raf = 0;
+          let hidden = false;
+          function check() {
+            raf = 0;
+            let maxBottom = 0;
+            for (const child of content.children) {
+              if (child === note) continue;
+              const cs = getComputedStyle(child);
+              if (cs.display === "none" || cs.visibility === "hidden") continue;
+              const r = child.getBoundingClientRect();
+              if (r.bottom > maxBottom) maxBottom = r.bottom;
+            }
+            const noteTop = note.getBoundingClientRect().top;
+            const next = hidden
+              ? maxBottom + 48 > noteTop
+              : maxBottom + 8 > noteTop;
+            if (next === hidden) return;
+            hidden = next;
+            note.classList.toggle("steam-hidden", hidden);
+            content.classList.toggle("steam-hidden", hidden);
+          }
+          function schedule() {
+            if (!raf) raf = requestAnimationFrame(check);
+          }
+          if ("ResizeObserver" in window) {
+            const ro = new ResizeObserver(schedule);
+            ro.observe(content);
+            ro.observe(note);
+            for (const child of content.children) {
+              if (child !== note) ro.observe(child);
+            }
+          }
+          window.addEventListener("resize", schedule);
+          // Run after layout settles (two RAFs covers fonts + initial
+          // iframe sizing on Chromium).
+          requestAnimationFrame(() => requestAnimationFrame(check));
+        })();
 
         let db;
         try {
@@ -1314,7 +2128,9 @@
         const $info = document.getElementById("info-fresh");
         if ($info) $info.style.display = "none";
         if ($load) $load.style.display = "none";
+        if ($loadZip) $loadZip.style.display = "none";
         if ($managePanel) $managePanel.classList.add("visible");
+        updateExportSavesButton();
 
         const health = await runHealthcheck(db);
         renderHealthcheck(health);

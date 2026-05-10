@@ -183,6 +183,7 @@
         var DB_VERSION = 1;
         var STORE_NAME = "assets";
         var SAVE_DB_NAME = "tcoaal-saves";
+        var TRANSLATIONS_DB_NAME = "tcoaal-translations";
         var CLD_KEY = "data/9c7050ae76645487";
         var LANG_CACHE_KEY = "__lang_data__";
 
@@ -332,6 +333,7 @@
           }
           await dropDb(DB_NAME);
           await dropDb(SAVE_DB_NAME);
+          await dropDb(TRANSLATIONS_DB_NAME);
 
           // 5. Redirect.
           location.replace("/loader.html");
