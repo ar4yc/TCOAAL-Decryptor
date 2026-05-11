@@ -179,6 +179,132 @@
       (function () {
         "use strict";
 
+        // Site-wide lock check. /lock.json drives a maintenance / outage
+        // screen at /lock.html; if enabled we redirect there before doing
+        // anything else. Synchronous XHR is used so the splash never has
+        // a chance to render the game UI. cache:no-store equivalent is
+        // achieved with the cachebuster query:  sync XHR doesn't honour
+        // fetch options. Partial locks are short-circuited locally via
+        // a localStorage mirror written by lock.html on dismiss, so a
+        // user who already acknowledged isn't bounced through lock.html
+        // on every load.
+        try {
+          var _lx = new XMLHttpRequest();
+          _lx.open("GET", "/lock.json?_=" + Date.now(), false);
+          _lx.send();
+          if (_lx.status >= 200 && _lx.status < 300) {
+            var _lock = JSON.parse(_lx.responseText);
+            if (_lock && _lock.enabled) {
+              var _id = _lock.id || "default";
+              var _seen = null;
+              if (_lock.type === "partial") {
+                try {
+                  _seen = localStorage.getItem("__lock_dismissed__:" + _id);
+                } catch (_) {}
+              }
+              if (!_seen) {
+                location.replace(
+                  "/lock.html?return=" +
+                    encodeURIComponent(location.pathname + location.search),
+                );
+                return;
+              }
+            }
+          }
+        } catch (_) {}
+
+        // One-time translation-prefix save migration lives on its own page.
+        // If any localStorage save key still carries a "translation_*:" prefix
+        // we hand off to /migrate.html before doing anything else:  that page
+        // owns the backup-zip modal and the merge, and isn't fighting the
+        // game's PIXI canvas / boot-splash / LOADING image for the screen.
+        // location.replace keeps it out of session history.
+        //
+        // After a successful migration migrate.html sets the flag
+        // `_migration_translation_done`. With that flag present we never
+        // redirect again:  any straggler translation_<id>:* key is silently
+        // dropped (it can only be an orphan that slipped past the merge's
+        // sweep:  it would otherwise re-trigger this redirect on every
+        // boot, which is exactly the regression the flag is here to stop).
+        try {
+          var _migrationDone = false;
+          try {
+            _migrationDone = !!localStorage.getItem(
+              "_migration_translation_done",
+            );
+          } catch (_) {}
+          var _stragglers = [];
+          var _needsMigrate = false;
+          for (var _mi = 0; _mi < localStorage.length; _mi++) {
+            var _mk = localStorage.key(_mi);
+            if (typeof _mk !== "string") continue;
+            if (!/^translation_[^:]+:/.test(_mk)) continue;
+            _stragglers.push(_mk);
+            if (
+              !_migrationDone &&
+              /^translation_[^:]+:RPG (?:File\d+(?:bak)?|Global|Config)$/.test(
+                _mk,
+              )
+            ) {
+              _needsMigrate = true;
+            }
+          }
+          if (_needsMigrate) {
+            location.replace("/migrate.html");
+            return;
+          }
+          if (_migrationDone && _stragglers.length > 0) {
+            for (var _si = 0; _si < _stragglers.length; _si++) {
+              try {
+                localStorage.removeItem(_stragglers[_si]);
+              } catch (_) {}
+            }
+            // Mirror the LS purge into tcoaal-saves so a future
+            // restoreSavesFromIDB pass can't bring the stragglers back.
+            // Best-effort and async:  failures are silently ignored, since
+            // the LS purge above already addresses the user-visible symptom
+            // (the loader export reads LS only).
+            try {
+              var _sReq = indexedDB.open("tcoaal-saves", 1);
+              _sReq.onupgradeneeded = function (e) {
+                try {
+                  e.target.result.createObjectStore("saves");
+                } catch (_) {}
+              };
+              _sReq.onsuccess = function (e) {
+                var _db = e.target.result;
+                try {
+                  var _rtx = _db.transaction("saves", "readonly");
+                  var _kr = _rtx.objectStore("saves").getAllKeys();
+                  _kr.onsuccess = function () {
+                    var _keys = _kr.result || [];
+                    var _doom = [];
+                    for (var _ki = 0; _ki < _keys.length; _ki++) {
+                      var _ik = _keys[_ki];
+                      if (
+                        typeof _ik === "string" &&
+                        /^translation_[^:]+:/.test(_ik)
+                      ) {
+                        _doom.push(_ik);
+                      }
+                    }
+                    if (_doom.length === 0) return;
+                    try {
+                      var _wtx = _db.transaction("saves", "readwrite");
+                      var _st = _wtx.objectStore("saves");
+                      for (var _di = 0; _di < _doom.length; _di++) {
+                        try {
+                          _st.delete(_doom[_di]);
+                        } catch (_) {}
+                      }
+                    } catch (_) {}
+                  };
+                } catch (_) {}
+              };
+            } catch (_) {}
+          }
+        } catch (_) {}
+
         var DB_NAME = "tcoaal";
         var DB_VERSION = 1;
         var STORE_NAME = "assets";

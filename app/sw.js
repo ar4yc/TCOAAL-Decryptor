@@ -634,6 +634,10 @@ self.addEventListener("fetch", (event) => {
     logicalPath === "loader.html" ||
     logicalPath === "sw.js" ||
     logicalPath === "index.html" ||
+    logicalPath === "migrate.html" ||
+    logicalPath === "lock.html" ||
+    logicalPath === "lock.json" ||
+    logicalPath === "test.html" ||
     logicalPath === "js/libs/pako_inflate.min.js" ||
     logicalPath === "js/libs/browser-shim.js" ||
     logicalPath === "js/libs/lang-shim.js" ||

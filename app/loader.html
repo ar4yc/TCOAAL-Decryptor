@@ -52,12 +52,15 @@
         height: 100vh;
         display: flex;
         justify-content: center;
-        background: var(--black);
-        background-image: url("img/bg.webp");
-        background-repeat: no-repeat;
-        background-position: top center;
-        background-attachment: local;
-        background-size: cover;
+        background:
+          linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 30%,
+            rgba(0, 0, 0, 0.45) 60%,
+            rgba(0, 0, 0, 0.75) 100%
+          ),
+          url("img/bg.webp") top center / cover no-repeat,
+          var(--black);
         z-index: 1;
       }
 
@@ -94,12 +97,21 @@
         }
       }
 
-      /* GitHub link (top-right) */
-      .github-link {
+      /* Top-right link stack: GitHub on top, Creator Tools below. */
+      .top-links {
         position: absolute;
         top: 0;
         right: 0;
         z-index: 10;
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 6px;
+        padding: 8px;
+      }
+
+      .github-link,
+      .tool-link {
         color: rgba(255, 255, 255, 0.9);
         text-decoration: none;
         transition: all 0.3s ease;
@@ -110,94 +122,200 @@
         gap: 8px;
         background: rgba(15, 15, 15, 0.8);
         border: 1px solid rgba(255, 255, 255, 0.1);
-        font-size: 0.8em;
+        font-size: 0.85em;
         font-family: "Georgia", serif;
       }
 
-      .github-link:hover,
-      .tool-link:hover {
+      .github-link:hover {
         color: var(--white);
         background: rgba(74, 144, 226, 0.15);
         border-color: rgba(74, 144, 226, 0.3);
         transform: translateY(-1px);
       }
 
-      .tool-link {
-        position: absolute;
-        top: 0;
-        left: 0;
-        z-index: 10;
-        color: rgba(255, 255, 255, 0.9);
-        text-decoration: none;
-        transition: all 0.3s ease;
-        padding: 8px 12px;
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: rgba(15, 15, 15, 0.8);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        font-size: 0.8em;
-        font-family: "Georgia", serif;
-      }
-
       .tool-link:hover {
+        color: var(--white);
         background: rgba(236, 131, 195, 0.15);
         border-color: rgba(236, 131, 195, 0.3);
+        transform: translateY(-1px);
       }
 
-      .tool-link .tool-icon {
-        width: 16px;
-        height: 16px;
-        fill: currentColor;
-      }
-
+      .tool-link .tool-icon,
       .github-link .github-icon {
-        width: 16px;
-        height: 16px;
+        width: 18px;
+        height: 18px;
         fill: currentColor;
+        flex: 0 0 auto;
       }
 
-      /* Central content */
+      .steam-buy-card {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: clamp(8px, 1.2vmin, 14px);
+        width: clamp(300px, 32vmin, 480px);
+        padding: clamp(12px, 1.6vmin, 20px);
+        background: rgba(15, 15, 15, 0.85);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 8px;
+        color: rgba(255, 255, 255, 0.92);
+        text-decoration: none;
+        font-family: "Georgia", serif;
+        transition:
+          background 0.25s ease,
+          border-color 0.25s ease,
+          box-shadow 0.25s ease;
+        box-shadow:
+          0 4px 16px rgba(0, 0, 0, 0.55),
+          inset 0 0 12px rgba(0, 0, 0, 0.4);
+      }
+
+      .steam-buy-card:hover {
+        background: rgba(122, 10, 10, 0.32);
+        border-color: rgba(236, 131, 195, 0.55);
+        box-shadow:
+          0 6px 22px rgba(236, 131, 195, 0.28),
+          inset 0 0 12px rgba(0, 0, 0, 0.4);
+      }
+
+      .steam-buy-card .steam-header-img {
+        display: block;
+        width: 100%;
+        height: auto;
+        aspect-ratio: 460 / 215;
+        object-fit: cover;
+        border: 2px solid var(--black);
+        border-radius: 4px;
+        background: #0a0a0a;
+      }
+
+      .steam-buy-card .steam-buy-label {
+        text-align: center;
+        font-size: clamp(15px, 2vmin, 20px);
+        letter-spacing: 0.1em;
+        font-weight: bold;
+        color: var(--white);
+        text-transform: uppercase;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+      }
+
+      @media (max-width: 720px) {
+        .steam-buy-card {
+          display: none;
+        }
+      }
+
       .content {
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2vmax;
-        padding: 3vmax;
-
-        padding-bottom: 220px;
+        gap: clamp(14px, 2.2vmin, 28px);
+        padding: max(160px, 40vh) clamp(16px, 3vmin, 36px)
+          clamp(12px, 2vmin, 28px);
         text-align: center;
-        min-height: 100vh;
-        justify-content: center;
+        height: 100vh;
         position: relative;
         overflow-y: auto;
-        transition: padding-bottom 0.4s ease;
-      }
-      .content.steam-hidden {
-        padding-bottom: 0;
+        width: min(960px, 96vw);
+        margin: 0 auto;
       }
 
       .content h1 {
         color: var(--txt-color);
-        font-size: 2vmax;
+        font-size: clamp(20px, 3vmin, 32px);
         font-weight: normal;
         letter-spacing: 0.05em;
         margin: 0;
+        text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
       }
 
       .content .subtitle {
-        font-size: 1vmax;
+        font-size: clamp(13px, 1.7vmin, 18px);
         color: var(--default);
         letter-spacing: 0.08em;
         text-transform: uppercase;
-        margin-top: -1vmax;
+        margin-top: -8px;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
       }
 
-      .content .info {
-        font-size: 0.9vmax;
-        line-height: 1.65;
-        /*max-width: 500px;*/
+      .panel {
+        width: 100%;
+        max-width: min(640px, 92vw);
+        padding: clamp(16px, 2.2vmin, 26px) clamp(18px, 2.4vmin, 30px);
+        background: rgba(20, 20, 20, 0.88);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        box-shadow:
+          0 6px 24px rgba(0, 0, 0, 0.55),
+          inset 0 0 24px rgba(0, 0, 0, 0.35);
+      }
+
+      .panel-title {
+        color: var(--purple);
+        font-family: "Georgia", serif;
+        font-size: clamp(15px, 1.9vmin, 20px);
+        font-weight: normal;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 0;
+        text-align: center;
+      }
+
+      .info-panel {
+        display: flex;
+        flex-direction: column;
+        gap: clamp(8px, 1.2vmin, 14px);
+        text-align: center;
+      }
+
+      .info-panel .info {
+        font-size: clamp(14px, 1.7vmin, 18px);
+        line-height: 1.6;
+        color: rgba(255, 255, 255, 0.82);
+        margin: 0;
+      }
+
+      .info-panel .info-aside {
+        font-size: clamp(12px, 1.15vmin, 15px);
+        line-height: 1.55;
+        color: rgba(255, 255, 255, 0.55);
+        margin: 0;
+      }
+
+      .path-hint {
+        font-size: clamp(12px, 1.15vmin, 15px);
+        line-height: 1.55;
+        color: rgba(255, 255, 255, 0.5);
+        margin: 0;
+        display: none;
+      }
+      .path-hint.visible {
+        display: block;
+      }
+      .path-hint code {
+        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+        font-size: 0.95vmin;
+        color: rgba(255, 255, 255, 0.78);
+        background: rgba(0, 0, 0, 0.35);
+        padding: 2px 6px;
+        border-radius: 3px;
+        word-break: break-all;
+      }
+
+      .panel-footer {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        gap: clamp(8px, 1vmin, 14px);
+        margin-top: clamp(4px, 0.6vmin, 10px);
+        padding-top: clamp(10px, 1.4vmin, 18px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .panel-footer .action-btn {
+        width: 100%;
       }
 
       /* Hidden file input */
@@ -211,9 +329,9 @@
         color: var(--txt-color);
         border: none;
         border-radius: 4px;
-        padding: 0.8vmax 2vmax;
+        padding: clamp(10px, 1.4vmin, 18px) clamp(16px, 2.8vmin, 32px);
         cursor: pointer;
-        font-size: 1.8vmax;
+        font-size: clamp(15px, 2.3vmin, 24px);
         font-family: "Georgia", serif;
         font-weight: bold;
         transition: all 0.2s;
@@ -235,8 +353,8 @@
       }
 
       .action-btn.secondary {
-        font-size: 1.2vmax;
-        padding: 0.5vmax 1.5vmax;
+        font-size: clamp(13px, 1.7vmin, 19px);
+        padding: clamp(7px, 1vmin, 13px) clamp(14px, 2.1vmin, 26px);
         background: var(--bg-color-section);
       }
 
@@ -246,8 +364,8 @@
 
       .progress-wrap {
         display: none;
-        width: 90%;
-        max-width: 500px;
+        width: 100%;
+        max-width: 640px;
       }
 
       .progress-wrap.visible {
@@ -256,11 +374,11 @@
 
       .bar-track {
         width: 100%;
-        height: 2vmax;
+        height: clamp(18px, 2vmin, 26px);
         background: var(--bg-color-section-lighter);
-        border-radius: 1vmax;
+        border-radius: clamp(9px, 1vmin, 13px);
         overflow: hidden;
-        margin-bottom: 1vmax;
+        margin-bottom: clamp(8px, 1vmin, 14px);
         border: 2px solid var(--black);
         position: relative;
       }
@@ -272,17 +390,17 @@
         transition: width 0.3s ease;
         border: 2px solid var(--black);
         box-sizing: border-box;
-        border-radius: 0.8vmax;
+        border-radius: clamp(7px, 0.8vmin, 11px);
       }
 
       .status {
         text-align: center;
         color: var(--txt-color);
-        font-size: 0.9vmax;
+        font-size: clamp(14px, 1.9vmin, 20px);
         min-height: 1.2em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.65);
+        word-break: break-word;
+        line-height: 1.4;
       }
 
       .status.error {
@@ -296,10 +414,10 @@
         display: none;
         flex-direction: column;
         align-items: center;
-        gap: 1.2vmax;
-        max-width: 540px;
-        margin-top: 1.5vmax;
-        padding: 1.5vmax 2vmax;
+        gap: clamp(10px, 1.2vmin, 18px);
+        max-width: min(640px, 92vw);
+        margin-top: clamp(12px, 1.5vmin, 22px);
+        padding: clamp(14px, 1.5vw, 22px) clamp(16px, 2vw, 28px);
         background: #1a0d0e;
         border: 1px solid rgba(149, 84, 86, 0.7);
         border-radius: 6px;
@@ -310,29 +428,29 @@
       }
       .error-panel h2 {
         color: var(--red);
-        font-size: 1.3vmax;
+        font-size: clamp(15px, 1.4vmin, 20px);
         font-weight: normal;
         margin: 0;
       }
       .error-panel .error-body {
         color: rgba(255, 255, 255, 0.8);
-        font-size: 0.95vmax;
+        font-size: clamp(13px, 1.15vmin, 16px);
         line-height: 1.5;
         text-align: center;
       }
       .error-panel .error-detail {
         font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        font-size: 0.8vmax;
+        font-size: clamp(11px, 0.95vmin, 13px);
         color: #c8a;
         background: rgba(0, 0, 0, 0.3);
-        padding: 0.6vmax 0.8vmax;
+        padding: clamp(6px, 0.7vw, 10px) clamp(8px, 0.9vw, 12px);
         border-radius: 4px;
         max-width: 100%;
         word-break: break-word;
       }
       .error-panel .error-actions {
         display: flex;
-        gap: 1vmax;
+        gap: clamp(8px, 1vmin, 14px);
         flex-wrap: wrap;
         justify-content: center;
       }
@@ -341,9 +459,9 @@
         display: none;
         flex-direction: column;
         align-items: center;
-        gap: 1.5vmax;
-        max-width: 600px;
-        /*width: 90%;*/
+        gap: clamp(12px, 1.5vmin, 22px);
+        width: 100%;
+        max-width: min(640px, 92vw);
       }
       .manage-panel.visible {
         display: flex;
@@ -352,77 +470,75 @@
         display: flex;
         flex-direction: column;
         align-items: stretch;
-        gap: 1vmax;
+        gap: clamp(8px, 1vmin, 14px);
         width: 100%;
-        max-width: 480px;
       }
       .manage-actions .action-btn.play {
-        background: #7a0a0a;
-        color: var(--white);
+        background: var(--green);
+        color: var(--black);
         border: 3px solid var(--black);
-        font-size: 2.6vmax;
-        letter-spacing: 0.18em;
-        padding: 1vmax 2vmax;
-        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+        font-size: clamp(20px, 3.2vmin, 34px);
+        letter-spacing: 0.14em;
+        padding: clamp(10px, 1.6vmin, 20px) clamp(20px, 3.2vmin, 36px);
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
         box-shadow:
-          0 0 14px rgba(122, 10, 10, 0.5),
+          0 0 14px rgba(134, 211, 122, 0.5),
           inset 0 0 18px rgba(0, 0, 0, 0.35);
       }
       .manage-actions .action-btn.play:hover:not(:disabled) {
-        background: #9a1414;
+        background: #a4e09a;
         box-shadow:
-          0 0 22px rgba(154, 20, 20, 0.65),
+          0 0 22px rgba(164, 224, 154, 0.65),
           inset 0 0 18px rgba(0, 0, 0, 0.35);
-      }
-      .reimport-row {
-        display: flex;
-        gap: 1vmax;
-        width: 100%;
-      }
-      .reimport-row .action-btn {
-        flex: 1;
-        min-width: 0;
-        font-size: 0.8vmax;
-        padding: 0.1vmax 1vmax;
       }
       .manage-actions .action-btn.export-saves {
         width: 100%;
-        font-size: 0.8vmax;
-        padding: 0.1vmax 1vmax;
+        font-size: clamp(12px, 1.05vmin, 15px);
+        padding: clamp(6px, 0.7vw, 12px) clamp(10px, 1.2vw, 18px);
+        background: var(--bg-color-section);
+      }
+      .manage-actions .action-btn.export-saves:hover:not(:disabled) {
+        background: var(--bg-color-section-lighter);
       }
 
-      /* Healthcheck / missing-files report */
       .health-panel {
         display: none;
         flex-direction: column;
-        gap: 0.7vmax;
-        width: 100%;
-        padding: 0.8vmax 0.5vmax;
-        background: rgba(20, 20, 20, 0.85);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 6px;
+        gap: clamp(10px, 1.4vmin, 16px);
+        position: relative;
       }
       .health-panel.visible {
         display: flex;
       }
-      .health-panel.warn {
-        border-color: rgba(238, 234, 114, 0.5);
-      }
-      .health-panel.ok {
-        border-color: rgba(134, 211, 122, 0.5);
-      }
 
-      .health-summary-row {
+      .health-header {
         display: flex;
         align-items: center;
-        justify-content: space-between;
-        gap: 1vmax;
-        width: 100%;
+        justify-content: center;
+        gap: clamp(8px, 1vmin, 12px);
       }
+      .health-dot {
+        width: clamp(8px, 1.1vmin, 11px);
+        height: clamp(8px, 1.1vmin, 11px);
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.5);
+        flex: 0 0 auto;
+      }
+      .health-panel.warn .health-dot {
+        background: var(--yellow);
+        box-shadow: 0 0 8px rgba(238, 234, 114, 0.7);
+      }
+      .health-panel.ok .health-dot {
+        background: var(--green);
+        box-shadow: 0 0 8px rgba(134, 211, 122, 0.7);
+      }
+
       .health-summary {
-        flex: 1;
-        font-size: 0.9vmax;
-        color: rgba(255, 255, 255, 0.75);
+        font-size: clamp(15px, 2vmin, 21px);
+        color: rgba(255, 255, 255, 0.92);
+        line-height: 1.35;
+        font-weight: bold;
+        text-align: center;
       }
       .health-summary.ok {
         color: var(--green);
@@ -431,22 +547,35 @@
         color: var(--yellow);
       }
 
+      .health-counts {
+        font-size: clamp(13px, 1.5vmin, 16px);
+        color: rgba(255, 255, 255, 0.62);
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        letter-spacing: 0.02em;
+      }
+      .health-counts:empty {
+        display: none;
+      }
+
       .health-note {
-        font-size: 0.65vmax;
-        color: rgba(255, 255, 255, 0.6);
+        font-size: clamp(12px, 1.4vmin, 15px);
+        color: rgba(255, 255, 255, 0.7);
+        line-height: 1.5;
+        text-align: center;
       }
       .health-note:empty {
         display: none;
       }
       .missing-list {
         display: none;
-        max-height: 18vmax;
+        max-height: clamp(160px, 22vh, 320px);
         overflow-y: auto;
         font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        font-size: 0.5vmax;
+        font-size: clamp(11px, 1.2vmin, 14px);
         color: #c8a;
         background: rgba(0, 0, 0, 0.4);
-        padding: 0.5vmax 0.7vmax;
+        padding: clamp(8px, 1vmin, 12px) clamp(10px, 1.2vmin, 14px);
         border-radius: 4px;
         white-space: pre;
         text-align: left;
@@ -455,20 +584,36 @@
         display: block;
       }
       .health-toggle {
-        font-size: 0.5vmax;
-        color: rgba(255, 255, 255, 0.55);
+        font-size: clamp(12px, 1.4vmin, 15px);
+        color: rgba(255, 255, 255, 0.65);
         cursor: pointer;
         text-decoration: underline;
         background: none;
         border: 0;
         padding: 0;
         font-family: inherit;
-        align-self: flex-start;
+        align-self: center;
+      }
+      .health-toggle:hover {
+        color: var(--white);
+      }
+      .health-footer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        align-items: center;
+        gap: clamp(6px, 0.9vmin, 12px);
+        margin-top: clamp(2px, 0.4vmin, 6px);
+        padding-top: clamp(8px, 1.2vmin, 14px);
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      .health-footer .action-btn.compact {
+        flex: 0 1 auto;
       }
 
       .action-btn.compact {
-        font-size: 0.8vmax;
-        padding: 0.35vmax 0.9vmax;
+        font-size: clamp(12px, 1vmin, 14px);
+        padding: clamp(4px, 0.5vw, 8px) clamp(8px, 1vw, 14px);
         white-space: nowrap;
         flex: 0 0 auto;
       }
@@ -481,6 +626,13 @@
         background: rgba(149, 84, 86, 0.45);
         color: var(--white);
       }
+      .action-btn.success {
+        background: var(--green);
+        color: var(--black);
+      }
+      .action-btn.success:hover:not(:disabled) {
+        background: #a4e09a;
+      }
 
       .confirm-dialog {
         display: none;
@@ -490,7 +642,7 @@
         z-index: 50;
         justify-content: center;
         align-items: center;
-        padding: 2vmax;
+        padding: clamp(16px, 2vmin, 32px);
         overflow-y: auto;
       }
       .confirm-dialog.visible {
@@ -500,23 +652,24 @@
         background: var(--bg-color);
         border: 1px solid rgba(149, 84, 86, 0.6);
         border-radius: 8px;
-        padding: 2vmax 2.2vmax 1.6vmax;
-        max-width: 540px;
-        width: 100%;
+        padding: clamp(18px, 2vw, 28px) clamp(20px, 2.2vw, 32px)
+          clamp(14px, 1.6vw, 22px);
+        width: min(620px, 92vw);
+        max-width: 100%;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
         display: flex;
         flex-direction: column;
-        gap: 1vmax;
+        gap: clamp(8px, 1vmin, 14px);
       }
       .confirm-dialog-content h2 {
         color: var(--red);
-        font-size: 1.4vmax;
+        font-size: clamp(17px, 1.5vmin, 22px);
         font-weight: normal;
         text-align: center;
         margin: 0;
       }
       .confirm-dialog-content p {
-        font-size: 0.95vmax;
+        font-size: clamp(13px, 1.15vmin, 16px);
         line-height: 1.55;
         text-align: center;
         color: rgba(255, 255, 255, 0.85);
@@ -526,12 +679,13 @@
         color: var(--yellow);
       }
       .confirm-saves-msg {
-        font-size: 0.85vmax;
+        font-size: clamp(12px, 1vmin, 14px);
         text-align: center;
         color: rgba(255, 255, 255, 0.6);
+        line-height: 1.4;
       }
       .confirm-saves-status {
-        font-size: 0.85vmax;
+        font-size: clamp(12px, 1vmin, 14px);
         text-align: center;
         min-height: 1em;
         color: rgba(255, 255, 255, 0.6);
@@ -546,72 +700,62 @@
         display: flex;
         flex-wrap: wrap;
         justify-content: center;
-        gap: 0.8vmax;
-        margin-top: 0.4vmax;
+        gap: clamp(8px, 1vmin, 14px);
+        margin-top: clamp(4px, 0.5vmin, 8px);
       }
       .confirm-actions .action-btn {
-        font-size: 1vmax;
-        padding: 0.6vmax 1.4vmax;
-      }
-
-      /* Bottom note + Steam widget */
-      .bottom-note {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0;
-        margin: 0;
-        line-height: 1;
-        position: fixed;
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        font-style: italic;
-        z-index: 5;
-        transition: opacity 0.4s ease;
-      }
-
-      #steam-buy-frame {
-        border: 0;
-        z-index: 100;
-        margin: 0;
-      }
-
-      .bottom-note.steam-hidden {
-        opacity: 0;
-        pointer-events: none;
+        font-size: clamp(13px, 1.15vmin, 16px);
+        padding: clamp(7px, 0.7vw, 12px) clamp(12px, 1.4vw, 20px);
       }
     </style>
   </head>
   <body>
     <div class="overlay">
+      <div class="top-links">
+        <a
+          href="https://github.com/Kidev/TCOAALBrowserLoader"
+          target="_blank"
+          rel="noopener"
+          class="github-link"
+          onclick="event.stopPropagation()"
+        >
+          <svg class="github-icon" viewBox="0 0 24 24">
+            <path
+              d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"
+            ></path>
+          </svg>
+          <span>AGPLv3 licensed, hosted on GitHub Pages</span>
+        </a>
+        <a
+          href="https://tcoaal.kidev.org"
+          target="_blank"
+          rel="noopener"
+          class="tool-link"
+          onclick="event.stopPropagation()"
+        >
+          <svg class="tool-icon" viewBox="0 0 24 24">
+            <path
+              d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"
+            />
+          </svg>
+          <span>More tools and utilities for TCOAAL</span>
+        </a>
+      </div>
+
       <a
-        href="https://tcoaal.kidev.org"
+        href="https://store.steampowered.com/app/2378900/The_Coffin_of_Andy_and_Leyley/"
         target="_blank"
         rel="noopener"
-        class="tool-link"
+        class="steam-buy-card"
         onclick="event.stopPropagation()"
       >
-        <svg class="tool-icon" viewBox="0 0 24 24">
-          <path
-            d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.48.48 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.74 8.87a.48.48 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1 1 12 8.4a3.6 3.6 0 0 1 0 7.2z"
-          />
-        </svg>
-        <span style="font-size: 1vmax">TCOAAL Creator Tools</span>
-      </a>
-      <a
-        href="https://github.com/Kidev/TCOAALBrowserLoader"
-        target="_blank"
-        rel="noopener"
-        class="github-link"
-        onclick="event.stopPropagation()"
-      >
-        <svg class="github-icon" viewBox="0 0 24 24">
-          <path
-            d="M12,2A10,10 0 0,0 2,12C2,16.42 4.87,20.17 8.84,21.5C9.34,21.58 9.5,21.27 9.5,21C9.5,20.77 9.5,20.14 9.5,19.31C6.73,19.91 6.14,17.97 6.14,17.97C5.68,16.81 5.03,16.5 5.03,16.5C4.12,15.88 5.1,15.9 5.1,15.9C6.1,15.97 6.63,16.93 6.63,16.93C7.5,18.45 8.97,18 9.54,17.76C9.63,17.11 9.89,16.67 10.17,16.42C7.95,16.17 5.62,15.31 5.62,11.5C5.62,10.39 6,9.5 6.65,8.79C6.55,8.54 6.2,7.5 6.75,6.15C6.75,6.15 7.59,5.88 9.5,7.17C10.29,6.95 11.15,6.84 12,6.84C12.85,6.84 13.71,6.95 14.5,7.17C16.41,5.88 17.25,6.15 17.25,6.15C17.8,7.5 17.45,8.54 17.35,8.79C18,9.5 18.38,10.39 18.38,11.5C18.38,15.32 16.04,16.16 13.81,16.41C14.17,16.72 14.5,17.33 14.5,18.26C14.5,19.6 14.5,20.68 14.5,21C14.5,21.27 14.66,21.59 15.17,21.5C19.14,20.16 22,16.42 22,12A10,10 0 0,0 12,2Z"
-          ></path>
-        </svg>
-        <span style="font-size: 1vmax">View on GitHub</span>
+        <img
+          class="steam-header-img"
+          src="img/tcoaal-steam-header.jpg"
+          alt="The Coffin of Andy and Leyley"
+          loading="lazy"
+        />
+        <span class="steam-buy-label">Buy on Steam</span>
       </a>
 
       <div class="content">
@@ -628,38 +772,52 @@
           hidden
         />
 
-        <button class="action-btn" id="btn-load" onclick="loadGameFiles()">
-          Import Folder
-        </button>
-        <button
-          class="action-btn secondary"
-          id="btn-load-zip"
-          onclick="loadGameZip()"
-        >
-          Import as .zip file
-        </button>
+        <div class="panel info-panel" id="info-fresh">
+          <h2 class="panel-title">Play TCOAAL in browser (desktop/mobile)</h2>
+          <p class="info">
+            You need to own the game
+            <b
+              onclick="
+                window.open(
+                  'https://store.steampowered.com/app/2378900/The_Coffin_of_Andy_and_Leyley/',
+                  '_blank',
+                )
+              "
+              style="cursor: pointer"
+              >The Coffin of Andy and Leyley</b
+            >
+            by Kit9
+          </p>
+          <p class="info">
+            Load your owned copy of the game into your browser,<br />
+            either as a folder or as a .zip archive.
+          </p>
+          <p class="info-aside">
+            Your files stay on your device and are never uploaded anywhere
+          </p>
+          <p class="path-hint" id="path-hint">
+            Your game folder is likely located at<br />
+            <code id="path-hint-value"></code>
+          </p>
+          <div class="panel-footer">
+            <button class="action-btn" id="btn-load" onclick="loadGameFiles()">
+              Import Folder
+            </button>
+            <button
+              class="action-btn secondary"
+              id="btn-load-zip"
+              onclick="loadGameZip()"
+            >
+              Import .zip file
+            </button>
+          </div>
+        </div>
 
         <div class="manage-panel" id="manage-panel">
           <div class="manage-actions">
             <button class="action-btn play" id="btn-play" onclick="goToGame()">
               PLAY
             </button>
-            <div class="reimport-row">
-              <button
-                class="action-btn"
-                id="btn-reimport"
-                onclick="loadGameFiles()"
-              >
-                Re-import folder
-              </button>
-              <button
-                class="action-btn"
-                id="btn-reimport-zip"
-                onclick="loadGameZip()"
-              >
-                Re-import .zip
-              </button>
-            </div>
             <button
               class="action-btn export-saves"
               id="btn-export-saves"
@@ -669,17 +827,12 @@
               Export save files
             </button>
           </div>
-          <div class="health-panel" id="health-panel">
-            <div class="health-summary-row">
+          <div class="panel health-panel" id="health-panel">
+            <div class="health-header">
+              <span class="health-dot"></span>
               <div class="health-summary" id="health-summary">Scanning...</div>
-              <button
-                class="action-btn compact danger"
-                id="btn-clear"
-                onclick="askClearAll()"
-              >
-                Clear data
-              </button>
             </div>
+            <div class="health-counts" id="health-counts"></div>
             <div class="health-note" id="health-note"></div>
             <button
               class="health-toggle"
@@ -690,6 +843,29 @@
               Show missing files
             </button>
             <div class="missing-list" id="missing-list"></div>
+            <div class="health-footer">
+              <button
+                class="action-btn compact"
+                id="btn-reimport"
+                onclick="loadGameFiles()"
+              >
+                Re-import folder
+              </button>
+              <button
+                class="action-btn compact"
+                id="btn-reimport-zip"
+                onclick="loadGameZip()"
+              >
+                Re-import .zip
+              </button>
+              <button
+                class="action-btn compact danger"
+                id="btn-clear"
+                onclick="askClearAll()"
+              >
+                Clear browser data
+              </button>
+            </div>
           </div>
         </div>
 
@@ -699,14 +875,14 @@
             <h2>Clear all game data?</h2>
             <p>
               This will erase the imported game files
-              <strong>and your save files</strong> from this browser.
-              This cannot be undone.
+              <strong>and your save files</strong> from this browser. This
+              cannot be undone.
             </p>
             <p class="confirm-saves-msg" id="confirm-saves-msg"></p>
             <p class="confirm-saves-status" id="confirm-saves-status"></p>
             <div class="confirm-actions">
               <button
-                class="action-btn"
+                class="action-btn success"
                 id="btn-confirm-download"
                 onclick="downloadSavesZip()"
               >
@@ -748,29 +924,109 @@
             </button>
           </div>
         </div>
-
-        <p class="info" id="info-fresh">
-          Load your owned copy of the game into this browser, either as a
-          folder or as a .zip archive.<br />
-          Your files stay on your device and are never uploaded anywhere.
-        </p>
-
-        <p class="bottom-note">
-          You need to own The Coffin of Andy and Leyley
-          <iframe
-            id="steam-buy-frame"
-            src="https://store.steampowered.com/widget/2378900/"
-            frameborder="0"
-            width="646"
-            height="190"
-            style="transform-origin: center top; transform: scale(0.65)"
-          ></iframe>
-        </p>
       </div>
     </div>
 
     <script>
       "use strict";
+
+      // Site-wide lock check (see /lock.html). Synchronous so the loader
+      // UI never renders when locked. Partial locks honour a localStorage
+      // dismiss flag written by lock.html.
+      (function () {
+        try {
+          var lx = new XMLHttpRequest();
+          lx.open("GET", "/lock.json?_=" + Date.now(), false);
+          lx.send();
+          if (lx.status < 200 || lx.status >= 300) return;
+          var lock = JSON.parse(lx.responseText);
+          if (!lock || !lock.enabled) return;
+          var id = lock.id || "default";
+          if (lock.type === "partial") {
+            try {
+              if (localStorage.getItem("__lock_dismissed__:" + id)) return;
+            } catch (_) {}
+          }
+          location.replace(
+            "/lock.html?return=" +
+              encodeURIComponent(location.pathname + location.search),
+          );
+        } catch (_) {}
+      })();
+
+      // Post-migration straggler sweep.
+      //
+      // /migrate.html removes translation_<lang>:RPG ... keys from LS+IDB on
+      // first run and sets `_migration_translation_done`. If anything later
+      // re-creates a translation_<lang>:RPG ... key (an older lang-shim that
+      // demoted translations to overhauls because /mods.json failed; an
+      // older build still on the user's tab via SW cache; etc.) the loader
+      // would otherwise include those keys in the save export zip, producing
+      // a `translation_<lang>/global.rpgsave` entry that the user has
+      // already opted out of. Drop them here, in both LS and IDB, before
+      // any save-related UI initialises. Same regex as index.html's
+      // straggler check so the two paths stay in sync.
+      (function () {
+        try {
+          if (!localStorage.getItem("_migration_translation_done")) return;
+          var doomed = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (typeof k === "string" && /^translation_[^:]+:/.test(k)) {
+              doomed.push(k);
+            }
+          }
+          for (var d = 0; d < doomed.length; d++) {
+            try {
+              localStorage.removeItem(doomed[d]);
+            } catch (_) {}
+          }
+          // IDB sweep is best-effort and async; the export button is hidden
+          // until collectSaveEntries finds something, and that read goes
+          // through LS only, so the LS purge above already fixes the
+          // user-visible symptom. The IDB pass keeps the two stores
+          // consistent so a future lang-shim restoreSavesFromIDB can't
+          // resurrect a freshly-dropped LS key on the next boot.
+          try {
+            var req = indexedDB.open("tcoaal-saves", 1);
+            req.onupgradeneeded = function (e) {
+              try {
+                e.target.result.createObjectStore("saves");
+              } catch (_) {}
+            };
+            req.onsuccess = function (e) {
+              var db = e.target.result;
+              try {
+                var rtx = db.transaction("saves", "readonly");
+                var keysReq = rtx.objectStore("saves").getAllKeys();
+                keysReq.onsuccess = function () {
+                  var keys = keysReq.result || [];
+                  var idoomed = [];
+                  for (var j = 0; j < keys.length; j++) {
+                    var ik = keys[j];
+                    if (
+                      typeof ik === "string" &&
+                      /^translation_[^:]+:/.test(ik)
+                    ) {
+                      idoomed.push(ik);
+                    }
+                  }
+                  if (idoomed.length === 0) return;
+                  try {
+                    var wtx = db.transaction("saves", "readwrite");
+                    var store = wtx.objectStore("saves");
+                    for (var w = 0; w < idoomed.length; w++) {
+                      try {
+                        store.delete(idoomed[w]);
+                      } catch (_) {}
+                    }
+                  } catch (_) {}
+                };
+              } catch (_) {}
+            };
+          } catch (_) {}
+        } catch (_) {}
+      })();
 
       // IndexedDB helpers
 
@@ -1056,6 +1312,7 @@
       function renderHealthcheck(health) {
         const $hp = document.getElementById("health-panel");
         const $sum = document.getElementById("health-summary");
+        const $counts = document.getElementById("health-counts");
         const $note = document.getElementById("health-note");
         const $tog = document.getElementById("health-toggle");
         const $list = document.getElementById("missing-list");
@@ -1064,41 +1321,55 @@
         $hp.classList.add("visible");
         $hp.classList.remove("ok", "warn");
         $sum.classList.remove("ok", "warn");
+        if ($counts) $counts.textContent = "";
         if ($note) $note.textContent = "";
 
         if (!health) {
-          $sum.textContent =
-            "Healthcheck unavailable (could not load expected-files.json).";
+          $sum.textContent = "Library status unavailable";
+          if ($note) {
+            $note.textContent =
+              "Couldn't load expected-files.json. The game should still run.";
+          }
           $tog.style.display = "none";
           $list.classList.remove("visible");
           return;
         }
+
+        const total = health.total;
+        const found = health.found;
+        const fmt = (n) => n.toLocaleString();
+
         if (health.missing.length === 0) {
           $hp.classList.add("ok");
           $sum.classList.add("ok");
           $sum.textContent = "All expected files are present";
+          if ($counts) {
+            $counts.textContent =
+              fmt(found) + " / " + fmt(total) + " files verified";
+          }
           $tog.style.display = "none";
           $list.classList.remove("visible");
           return;
         }
         $hp.classList.add("warn");
         $sum.classList.add("warn");
-        const files = health.missing.length === 1 ? "file" : "files";
-        /*$sum.textContent =
-          health.missing.length +
-          " " +
-          files +
-          " missing (" +
-          health.percent.toFixed(1) +
-          "% present).";*/
-        $sum.textContent =
-          health.missing.length +
-          " " +
-          files +
-          " missing";
+        const word = health.missing.length === 1 ? "file" : "files";
+        $sum.textContent = fmt(health.missing.length) + " " + word + " missing";
+        if ($counts) {
+          $counts.textContent =
+            fmt(found) +
+            " / " +
+            fmt(total) +
+            " files present (" +
+            health.percent.toFixed(1) +
+            "%)";
+        }
         if ($note) {
+          $note.style.whiteSpace = "pre-line";
           $note.textContent =
-            "The game might still run (game updates can cause this).";
+            "The game may still run despite this issue. But you may want to\n" +
+            "check for game updates and verify the integrity of game files in Steam.\n" +
+            "If it keeps appearing, then you need to wait for the website to be updated.";
         }
         $list.textContent = health.missing.join("\n");
         $tog.style.display = "";
@@ -1124,8 +1395,10 @@
         const $managePanel = document.getElementById("manage-panel");
         const $info = document.getElementById("info-fresh");
         if ($info) $info.style.display = "none";
-        if ($load) $load.style.display = "none";
-        if ($loadZip) $loadZip.style.display = "none";
+        // The import buttons are children of #info-fresh now, so hiding
+        // the panel hides them too. Setting an inline display:none on the
+        // buttons here would later beat setImportButtonsDisabled's class
+        // toggle, leaving a fresh-state error with no clickable buttons.
         if ($managePanel) $managePanel.classList.add("visible");
         updateExportSavesButton();
         renderHealthcheck(health);
@@ -1278,6 +1551,15 @@
           $loadZip.disabled = disabled;
           $loadZip.classList.toggle("loading-hidden", disabled);
         }
+        var info = document.getElementById("info-fresh");
+        if (!info) return;
+        if (disabled) {
+          info.style.display = "none";
+        } else {
+          var manage = document.getElementById("manage-panel");
+          var inManage = manage && manage.classList.contains("visible");
+          info.style.display = inManage ? "none" : "";
+        }
       }
 
       function showProgress(visible) {
@@ -1389,20 +1671,41 @@
           const reg = await navigator.serviceWorker.register("/sw.js", {
             scope: "/",
           });
-          // Force the browser to re-fetch sw.js and install any updated version
-          // immediately (skipWaiting + clients.claim in the new SW ensure it
-          // takes over before we redirect to index.html).
-          await reg.update();
-          // Wait for the (possibly new) SW to control this page.
-          if (!navigator.serviceWorker.controller) {
-            await new Promise((resolve) => {
+          // Force a re-fetch of sw.js to pick up any newer version.
+          // skipWaiting + clients.claim in the new SW ensure it takes
+          // control. We don't await this:  on first-ever install the
+          // returned promise can resolve before the page is actually
+          // controlled, and we'd rather block on the controllerchange
+          // signal below than on the update check itself.
+          reg.update().catch(() => {});
+
+          // Already controlled? Nothing more to wait for.
+          if (navigator.serviceWorker.controller) return;
+
+          // First-time install:  wait for a controller. There's a race
+          // where the SW can claim the page between the check above and
+          // addEventListener below  -  so we re-check inside the
+          // listener-bound promise. And we cap the wait at 8s:  if the
+          // SW never claims (extension blockers, broken activate), the
+          // page still works (fetches just fall through to network),
+          // so hanging the loader UI forever is the wrong default.
+          await Promise.race([
+            new Promise((resolve) => {
+              const finish = () => {
+                navigator.serviceWorker.removeEventListener(
+                  "controllerchange",
+                  finish,
+                );
+                resolve();
+              };
               navigator.serviceWorker.addEventListener(
                 "controllerchange",
-                resolve,
-                { once: true },
+                finish,
               );
-            });
-          }
+              if (navigator.serviceWorker.controller) finish();
+            }),
+            new Promise((resolve) => setTimeout(resolve, 8000)),
+          ]);
         } catch (err) {
           console.warn("[loader] SW registration failed:", err);
         }
@@ -1490,9 +1793,7 @@
           const extraLen = view.getUint16(p + 30, true);
           const commentLen = view.getUint16(p + 32, true);
           const localHdrOffset = view.getUint32(p + 42, true);
-          const name = decoder.decode(
-            bytes.subarray(p + 46, p + 46 + nameLen),
-          );
+          const name = decoder.decode(bytes.subarray(p + 46, p + 46 + nameLen));
           if (
             compSize === 0xffffffff ||
             uncompSize === 0xffffffff ||
@@ -1521,10 +1822,11 @@
         const view = new DataView(buffer);
         const bytes = new Uint8Array(buffer);
         const off = entry.localHdrOffset;
-        if (off + 30 > bytes.length || view.getUint32(off, true) !== ZIP_LFH_SIG) {
-          throw new Error(
-            "Corrupt ZIP local header for " + entry.name + ".",
-          );
+        if (
+          off + 30 > bytes.length ||
+          view.getUint32(off, true) !== ZIP_LFH_SIG
+        ) {
+          throw new Error("Corrupt ZIP local header for " + entry.name + ".");
         }
         // Local header has its own name/extra lengths:  they CAN differ
         // from the central directory copy (extra fields often do), so we
@@ -1535,15 +1837,15 @@
         const compressed = bytes.subarray(dataOff, dataOff + entry.compSize);
 
         if (entry.compMethod === 0) {
-          // STORED: copy out of the parent ArrayBuffer so the IDB put
-          // doesn't pin the entire ZIP buffer in memory via subarray.
           const out = new Uint8Array(entry.compSize);
           out.set(compressed);
           return out.buffer;
         }
         if (entry.compMethod === 8) {
           if (typeof pako === "undefined" || !pako.inflateRaw) {
-            throw new Error("pako.inflateRaw is unavailable; cannot decompress DEFLATE.");
+            throw new Error(
+              "pako.inflateRaw is unavailable; cannot decompress DEFLATE.",
+            );
           }
           const out = pako.inflateRaw(compressed);
           return out.buffer;
@@ -1806,8 +2108,7 @@
       function updateExportSavesButton() {
         const $btn = document.getElementById("btn-export-saves");
         if (!$btn) return;
-        $btn.style.display =
-          collectSaveEntries().length > 0 ? "" : "none";
+        $btn.style.display = collectSaveEntries().length > 0 ? "" : "none";
       }
 
       function collectSaveEntries() {
@@ -2043,6 +2344,39 @@
       // from index.html (no IDB, fresh visit). index.html handles the
       // fresh-visit redirect to here.
 
+      // Best-effort OS guess for the install-path hint in the info panel.
+      // We pick the dominant desktop Steam layout per platform and hide
+      // the hint outright on mobile/unknown (Steam doesn't run there, so
+      // the path is meaningless and would only mislead).
+      //
+      // userAgent is used in addition to the deprecated platform property
+      // so the check stays accurate on UA-CH-only browsers and on Linux
+      // builds where navigator.platform reports just "Linux x86_64".
+      function guessGameInstallPath() {
+        var ua = (navigator.userAgent || "") + " " + (navigator.platform || "");
+        if (/Android|iPhone|iPad|iPod|Mobile/i.test(ua)) return null;
+        if (/Win(dows|32|64|CE|NT)?/i.test(ua)) {
+          return "C:\\Program Files (x86)\\Steam\\steamapps\\common\\The Coffin of Andy and Leyley";
+        }
+        if (/Mac|Darwin/i.test(ua)) {
+          return "~/Library/Application Support/Steam/steamapps/common/The Coffin of Andy and Leyley";
+        }
+        if (/Linux|CrOS|BSD/i.test(ua)) {
+          return "~/.local/share/Steam/steamapps/common/The Coffin of Andy and Leyley";
+        }
+        return null;
+      }
+
+      (function applyPathHint() {
+        var path = guessGameInstallPath();
+        if (!path) return;
+        var hint = document.getElementById("path-hint");
+        var value = document.getElementById("path-hint-value");
+        if (!hint || !value) return;
+        value.textContent = path;
+        hint.classList.add("visible");
+      })();
+
       (async () => {
         document
           .getElementById("file-input")
@@ -2067,50 +2401,6 @@
           }
         });
 
-        // Steam-iframe overlap watcher.
-        (function watchSteamOverlap() {
-          const content = document.querySelector(".content");
-          const note = document.querySelector(".bottom-note");
-          if (!content || !note) return;
-
-          let raf = 0;
-          let hidden = false;
-          function check() {
-            raf = 0;
-            let maxBottom = 0;
-            for (const child of content.children) {
-              if (child === note) continue;
-              const cs = getComputedStyle(child);
-              if (cs.display === "none" || cs.visibility === "hidden") continue;
-              const r = child.getBoundingClientRect();
-              if (r.bottom > maxBottom) maxBottom = r.bottom;
-            }
-            const noteTop = note.getBoundingClientRect().top;
-            const next = hidden
-              ? maxBottom + 48 > noteTop
-              : maxBottom + 8 > noteTop;
-            if (next === hidden) return;
-            hidden = next;
-            note.classList.toggle("steam-hidden", hidden);
-            content.classList.toggle("steam-hidden", hidden);
-          }
-          function schedule() {
-            if (!raf) raf = requestAnimationFrame(check);
-          }
-          if ("ResizeObserver" in window) {
-            const ro = new ResizeObserver(schedule);
-            ro.observe(content);
-            ro.observe(note);
-            for (const child of content.children) {
-              if (child !== note) ro.observe(child);
-            }
-          }
-          window.addEventListener("resize", schedule);
-          // Run after layout settles (two RAFs covers fonts + initial
-          // iframe sizing on Chromium).
-          requestAnimationFrame(() => requestAnimationFrame(check));
-        })();
-
         let db;
         try {
           db = await openDB();
@@ -2123,12 +2413,12 @@
 
         if (!(await hasAnyAsset(db))) return; // fresh: default UI shows
 
-        // Already-imported: show manage panel and run healthcheck.
+        // Already-imported: show manage panel and run healthcheck. Hiding
+        // #info-fresh cascades to the import buttons it contains, so no
+        // explicit button hides are needed here.
         const $managePanel = document.getElementById("manage-panel");
         const $info = document.getElementById("info-fresh");
         if ($info) $info.style.display = "none";
-        if ($load) $load.style.display = "none";
-        if ($loadZip) $loadZip.style.display = "none";
         if ($managePanel) $managePanel.classList.add("visible");
         updateExportSavesButton();
 

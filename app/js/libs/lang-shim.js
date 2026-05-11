@@ -142,8 +142,9 @@
   /* RPG Maker save keys we care about (with optional mod prefix + backup suffix). */
   function isSaveKey(key) {
     var bare = key;
-    if (_activeMod && key.indexOf(_activeMod + ":") === 0) {
-      bare = key.substring(_activeMod.length + 1);
+    var scope = getActiveSaveScope();
+    if (scope && key.indexOf(scope + ":") === 0) {
+      bare = key.substring(scope.length + 1);
     }
     // Strip backup suffix if present
     if (bare.length > 3 && bare.substring(bare.length - 3) === "bak") {
@@ -224,8 +225,14 @@
   }
 
   // Restore saves from IDB to localStorage. Always check IDB and merge
-  // any missing keys, individual save files can be lost even if RPG Global
+  // any missing keys; individual save files can be lost even if RPG Global
   // survives (e.g. browser storage eviction, quota pressure).
+  //
+  // The translation-prefix save merge that used to run here has moved to
+  // its own page (/migrate.html). index.html redirects to it on boot when
+  // it spots any translation_*-prefixed save key, so by the time we reach
+  // this routine all keys are in canonical (unprefixed or overhaul-prefixed)
+  // form:  nothing for this code to special-case.
   function restoreSavesFromIDB() {
     openSaveDb(function (db) {
       if (!db) {
@@ -236,8 +243,8 @@
         var tx = db.transaction(SAVE_STORE, "readonly");
         var store = tx.objectStore(SAVE_STORE);
         var cursor = store.openCursor();
-        var count = 0;
-        var prefix = _activeMod ? _activeMod + ":" : "";
+        var scope = getActiveSaveScope();
+        var prefix = scope ? scope + ":" : "";
         cursor.onsuccess = function (e) {
           var c = e.target.result;
           if (c) {
@@ -246,10 +253,8 @@
               ? key.indexOf(prefix) === 0
               : key.indexOf(":") < 0 || !isSaveKey(key);
             if (keyMatchesMod && isSaveKey(key)) {
-              // Only restore keys missing from localStorage
               if (localStorage.getItem(key) === null) {
                 _origLSSetItem.call(localStorage, key, c.value);
-                count++;
               }
             }
             c.continue();
@@ -313,12 +318,42 @@
 
   /**
    * Translation mods share overhaul semantics on the client: exactly one
-   * active at a time, require reload when switched, save-isolation by mod
-   * id. The difference is only how files are fetched (remote URL vs local
-   * /mods/{id}/www/) and how dialogue text is built (CSV -> LUT).
+   * active at a time, require reload when switched. The difference is how
+   * files are fetched (remote URL vs local /mods/{id}/www/) and how dialogue
+   * text is built (CSV -> LUT). They are explicitly NOT a separate save
+   * scope: switching from French to English must not orphan French saves.
    */
   function isOverhaulLike(type) {
     return !isPluginType(type);
+  }
+
+  function isTranslationModId(id) {
+    if (!id) return false;
+    // Pattern-based detection comes first: any id with the "translation_"
+    // prefix is treated as a translation mod even when _modsData isn't
+    // available (e.g. /mods.json failed the sync XHR, or the entry was
+    // added after the manifest was last generated). Without this fallback
+    // a missing manifest demotes translations to overhaul-style scopes,
+    // which makes persistSaveScope write _activeSaveScope =
+    // "translation_<lang>" and the webStorageKey patch then prefixes
+    // every save with translation_<lang>: silently re-creating the
+    // exact keys /migrate.html was just used to remove.
+    if (id.indexOf("translation_") === 0) return true;
+    if (!_modsData) return false;
+    var entry = _modsData[id];
+    return !!(entry && isTranslationType(entry.type));
+  }
+
+  /**
+   * Mod id whose key prefix isolates saves in localStorage/IDB.
+   * Overhaul mods own a save scope; translation mods are transparent and
+   * share the underlying scope (currently always the base game, since one
+   * top-level mod is active at a time). Returns null when the active mod is
+   * a translation OR no mod is active, in which case saves live under the
+   * stock unprefixed RPG Maker keys.
+   */
+  function getActiveSaveScope() {
+    return isTranslationModId(_activeMod) ? null : _activeMod;
   }
 
   /** True when path is an absolute URL (translation mods host files remotely). */
@@ -455,6 +490,25 @@
     _activeMod = localStorage.getItem("_activeMod") || null;
   } catch (e) {}
 
+  // Mirror the computed save scope into localStorage so browser-shim's
+  // modAwareKey (which the DRM uses for save fs reads/writes) can pick
+  // the right prefix without needing access to the mods registry.
+  // "" (empty string) is meaningful: it means "no scope, use bare key"
+  // and is distinct from "key absent". Pre-update localStorage may only
+  // have _activeMod set; browser-shim falls back to that until we
+  // overwrite the scope key here.
+  function persistSaveScope() {
+    try {
+      localStorage.setItem("_activeSaveScope", getActiveSaveScope() || "");
+    } catch (e) {}
+  }
+  persistSaveScope();
+
+  // The one-time translation-prefix save merge lives on its own page
+  // (/migrate.html). index.html redirects to it before booting when it
+  // sees any translation_*-prefixed save key, so by the time the game
+  // boots LS/IDB already contain only canonical save keys.
+
   // Expose active mod's langFile path so browser-shim.js / Lang.search
   // can find language data at non-standard locations (e.g. data/dialogues).
   // Translation mods (dialogue.csv / dialogue.txt) are pre-parsed into
@@ -473,11 +527,14 @@
   // any DRM init code that reads/writes saves uses the correct mod prefix.
   // Without this, the DRM can capture the stock webStorageKey and operate
   // on unprefixed keys while our post-boot code uses prefixed keys.
-  if (_activeMod && typeof StorageManager !== "undefined") {
+  // Gate on getActiveSaveScope (not _activeMod) so translation mods:  which
+  // share the base game's save scope:  leave the stock webStorageKey alone.
+  if (getActiveSaveScope() && typeof StorageManager !== "undefined") {
     var _iife_orig_webStorageKey = StorageManager.webStorageKey;
     StorageManager.webStorageKey = function (savefileId) {
       var baseKey = _iife_orig_webStorageKey.call(this, savefileId);
-      return _activeMod ? _activeMod + ":" + baseKey : baseKey;
+      var scope = getActiveSaveScope();
+      return scope ? scope + ":" + baseKey : baseKey;
     };
   }
 
@@ -489,6 +546,9 @@
       if (modId) localStorage.setItem("_activeMod", modId);
       else localStorage.removeItem("_activeMod");
     } catch (e) {}
+    // Keep _activeSaveScope in sync so the DRM-side modAwareKey sees the
+    // new translation-aware scope without waiting for a page reload.
+    persistSaveScope();
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: "setActiveMod",
@@ -1314,15 +1374,16 @@
     loadDefaultModIcon();
 
     if (typeof StorageManager !== "undefined") {
-      // webStorageKey is already patched in the IIFE (before DRM) when a
-      // mod is active. Re-apply here unconditionally so it also works
-      // when no mod was active at IIFE time but one is activated later.
-      if (!_activeMod) {
+      // webStorageKey is already patched in the IIFE (before DRM) when an
+      // overhaul scope is active at boot. Re-apply here when it wasn't, so
+      // base-game / translation-mode boots are still able to switch to an
+      // overhaul mid-session and have their saves correctly scoped.
+      if (!getActiveSaveScope()) {
         var _orig_webStorageKey = StorageManager.webStorageKey;
         StorageManager.webStorageKey = function (savefileId) {
           var baseKey = _orig_webStorageKey.call(this, savefileId);
-          var mod = getActiveMod();
-          return mod ? mod + ":" + baseKey : baseKey;
+          var scope = getActiveSaveScope();
+          return scope ? scope + ":" + baseKey : baseKey;
         };
       }
 
@@ -1385,9 +1446,12 @@
       typeof StorageManager !== "undefined" &&
       typeof DataManager !== "undefined"
     ) {
-      // Tag every new save payload with the active mod id so cross-mod
+      // Tag every new save payload with the save-scope mod id so cross-mod
       // imports can be rejected. Native desktop saves won't carry this tag;
       // absence is treated as "base game" with a filename-prefix fallback.
+      // Translation mods deliberately do NOT contribute a tag:  they share
+      // the base game's save scope, so a save made under French and one
+      // made under English must be freely interchangeable.
       // `_modId` lives alongside system/screen/etc. in the contents object.
       // `extractSaveContents` only reads known keys, so the extra field is
       // harmless on load (desktop included).
@@ -1395,7 +1459,7 @@
         var _orig_makeSaveContents = DataManager.makeSaveContents;
         DataManager.makeSaveContents = function () {
           var contents = _orig_makeSaveContents.call(this);
-          contents._modId = getActiveMod() || null;
+          contents._modId = getActiveSaveScope() || null;
           return contents;
         };
       }
@@ -1527,8 +1591,12 @@
           });
           var url = URL.createObjectURL(blob);
           var a = document.createElement("a");
-          var mod = getActiveMod();
-          var prefix = mod ? mod + "_" : "";
+          // Filename prefix follows the save-scope mod, not the active mod:
+          // translations share the base game's scope, so exported files keep
+          // the bare `fileN.rpgsave` name and can be re-imported under any
+          // (or no) translation without filename-based origin mismatches.
+          var scope = getActiveSaveScope();
+          var prefix = scope ? scope + "_" : "";
           a.href = url;
           a.download = prefix + "file" + savefileId + ".rpgsave";
           document.body.appendChild(a);
@@ -1552,14 +1620,19 @@
 
       // Extract the origin mod id from an imported save. Prefers the
       // payload tag; falls back to filename prefix against known mod keys.
-      // Returns a mod id string or null (= base game).
+      // Returns a mod id string or null (= base game / translation scope).
+      // Translation mods are deliberately collapsed to null so a save
+      // exported under e.g. "translation_french" loads cleanly under any
+      // (or no) translation.
       function detectSaveOrigin(contents, filename) {
         if (contents && typeof contents._modId !== "undefined") {
-          return contents._modId || null;
+          var id = contents._modId || null;
+          return isTranslationModId(id) ? null : id;
         }
         if (filename && _modsData) {
           var keys = Object.keys(_modsData);
           for (var i = 0; i < keys.length; i++) {
+            if (isTranslationType(_modsData[keys[i]].type)) continue;
             if (filename.indexOf(keys[i] + "_") === 0) return keys[i];
           }
         }
@@ -1616,9 +1689,11 @@
                 SoundManager.playBuzzer();
                 return;
               }
-              // Origin check: block cross-context imports (base <-> mod, mod <-> mod)
+              // Origin check: block cross-context imports (base <-> overhaul,
+              // overhaul <-> overhaul). Translations share the base game's
+              // save scope, so compare on save scope rather than active mod.
               var saveModId = detectSaveOrigin(contents, filename);
-              var currentModId = getActiveMod() || null;
+              var currentModId = getActiveSaveScope() || null;
               if (saveModId !== currentModId) {
                 SoundManager.playBuzzer();
                 var src = modDisplayName(saveModId);
@@ -2949,11 +3024,13 @@
 
     function detectOrigin(contents, filename) {
       if (contents && typeof contents._modId !== "undefined") {
-        return contents._modId || null;
+        var id = contents._modId || null;
+        return isTranslationModId(id) ? null : id;
       }
       if (filename && _modsData) {
         var keys = Object.keys(_modsData);
         for (var i = 0; i < keys.length; i++) {
+          if (isTranslationType(_modsData[keys[i]].type)) continue;
           if (filename.indexOf(keys[i] + "_") === 0) return keys[i];
         }
       }
@@ -2995,7 +3072,7 @@
         var contents = parseDroppedSave(e.target.result);
         if (!contents) return;
         var saveModId = detectOrigin(contents, file.name);
-        var currentModId = getActiveMod() || null;
+        var currentModId = getActiveSaveScope() || null;
         if (saveModId !== currentModId) return;
         loadContentsAndStart(contents);
       };

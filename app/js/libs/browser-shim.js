@@ -115,10 +115,35 @@
     return null;
   }
 
-  // Helper: prefix a storage key with the active mod id (if any).
+  // Helper: prefix a storage key with the active save scope (if any).
+  //
+  // The DRM reads / writes saves through fake fs.{readFile,writeFile,
+  // unlink}Sync, which routes through this helper to find the localStorage
+  // entry. The save scope is broader than the active mod id: overhauls own
+  // their save scope, but translation mods are transparent and share the
+  // base game's scope (so French -> English doesn't orphan saves).
+  //
+  // lang-shim mirrors getActiveSaveScope() into localStorage under
+  // "_activeSaveScope":  "" means "no scope, use bare key":  so this
+  // module can do the translation-aware lookup without needing access
+  // to the mods registry. Falls back to "_activeMod" when the scope key
+  // is missing (legacy localStorage, or first paint before lang-shim
+  // has had a chance to write it).
   function modAwareKey(baseKey) {
     try {
+      var scope = localStorage.getItem("_activeSaveScope");
+      if (scope !== null) {
+        return scope ? scope + ":" + baseKey : baseKey;
+      }
       var mod = localStorage.getItem("_activeMod");
+      // Translation mods are transparent for saves (they share the base
+      // scope so French <-> English doesn't orphan saves). When the
+      // _activeSaveScope mirror hasn't been written yet (e.g. DRM payload
+      // runs before lang-shim's persistSaveScope), match getActiveSaveScope's
+      // logic by treating any translation_* id as no-scope. Otherwise the
+      // DRM resurrects translation_<lang>:RPG Global keys we just cleaned
+      // up in migrate.html, and the migration popup fires on every boot.
+      if (mod && mod.indexOf("translation_") === 0) return baseKey;
       return mod ? mod + ":" + baseKey : baseKey;
     } catch (e) {
       return baseKey;
