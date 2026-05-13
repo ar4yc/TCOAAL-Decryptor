@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Importing Data - TCOAAL Browser Player</title>
+    <title>Importing Saves - TCOAAL Browser Player</title>
     <style>
       :root {
         color-scheme: dark;
@@ -168,12 +168,12 @@
 
   <body>
     <div class="modal">
-      <h1 id="title">Importing data...</h1>
+      <h1 id="title">Importing saves...</h1>
 
       <div class="panel" id="panel-receiving">
         <p id="receiving-text">
           Waiting for <code>play-tcoaal.kidev.org</code> to start the
-          transfer...
+          save transfer...
         </p>
         <progress id="bar" max="100" value="0"></progress>
         <p class="status" id="status"></p>
@@ -211,7 +211,7 @@
       <div class="panel" id="panel-no-opener" hidden>
         <p>
           This page is the receiver for migrating your TCOAAL Browser Player
-          data from <code>play-tcoaal.kidev.org</code> to
+          saves from <code>play-tcoaal.kidev.org</code> to
           <code>tcoaal.app</code>.
         </p>
         <p>
@@ -235,6 +235,13 @@
       // this origin's storage.
 
       var SENDER_ORIGIN = "https://play-tcoaal.kidev.org";
+
+      // Only the saves DB is accepted. A stale cached copy of the old
+      // sender could still try to ship the asset DB (`tcoaal`, hundreds of
+      // MB of encrypted game files) or the translations DB
+      // (`tcoaal-translations`); those are re-derivable on this domain and
+      // would just waste the user's bandwidth and storage quota.
+      var ALLOWED_IDB_DBS = { "tcoaal-saves": true };
 
       var $title = document.getElementById("title");
       var $panelReceiving = document.getElementById("panel-receiving");
@@ -648,7 +655,7 @@
         $receivingText.textContent =
           "Importing " +
           formatBytes(totalBytes) +
-          " from play-tcoaal.kidev.org...";
+          " of saves from play-tcoaal.kidev.org...";
 
         var existingSaves = await readAllSaves();
         var hasExistingSaves = Object.keys(existingSaves).length > 0;
@@ -729,16 +736,18 @@
       async function handleLsEntries(data) {
         var entries = data.entries || [];
         for (var i = 0; i < entries.length; i++) {
+          var k = entries[i][0];
+          // Defence in depth: this page only migrates saves. The current
+          // sender already filters to save-shape keys, but a stale cached
+          // copy of the old sender could still ship arbitrary localStorage.
+          // Drop anything that isn't a save so the new domain stays clean.
+          if (!isSaveKey(k)) continue;
           try {
-            localStorage.setItem(entries[i][0], entries[i][1]);
+            localStorage.setItem(k, entries[i][1]);
           } catch (e) {
             // Quota or invalid value:  skip and continue, the sender's
             // ack-based flow expects us to keep going.
-            console.warn(
-              "[migrate-incoming] LS write failed for",
-              entries[i][0],
-              e,
-            );
+            console.warn("[migrate-incoming] LS write failed for", k, e);
           }
         }
         setProgress(data.bytes);
@@ -746,6 +755,18 @@
       }
 
       async function handleIdbChunk(data) {
+        if (!ALLOWED_IDB_DBS[data.db]) {
+          // Silently ack and skip: we don't want to create the asset DB
+          // here, but acking keeps the sender's serial pipeline moving so
+          // the migration as a whole still completes.
+          console.warn(
+            "[migrate-incoming] dropping idb-chunk for non-saves DB:",
+            data.db,
+          );
+          setProgress(data.bytes);
+          send({ type: "ack", kind: "idb" });
+          return;
+        }
         var cacheKey = data.db + "::" + data.store;
         var db = dbCache[cacheKey];
         if (!db) {
