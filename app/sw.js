@@ -273,9 +273,9 @@ function dekit(arrayBuffer, hashedRelPath) {
  * known Lang.isValid variant.
  *
  * Different DRM payloads across mods require different newData() shapes:
- *   - Base zlib DRM:  { langName, langInfo, fontFace, fontSize, fontFile,
+ *   - Base zlib DRM: { langName, langInfo, fontFace, fontSize, fontFile,
  *                       imgFiles, sysLabel, sysMenus, labelLUT, linesLUT }
- *   - TCOAALili DRM:  { langName, langInfo, fontFace, fontSize,
+ *   - TCOAALili DRM: { langName, langInfo, fontFace, fontSize,
  *                       sysLabel, sysMenus, labelLUT, linesLUT, imageLUT }
  *
  * isValid checks `key in data` for every newData key plus type parity, so the

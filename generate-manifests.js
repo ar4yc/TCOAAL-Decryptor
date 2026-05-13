@@ -10,7 +10,7 @@
  * - Non-_ mods with a "repo" field get author and lastUpdate fetched from
  *   the GitHub API.
  *
- * Usage:  node generate-manifests.js
+ * Usage: node generate-manifests.js
  */
 
 "use strict";

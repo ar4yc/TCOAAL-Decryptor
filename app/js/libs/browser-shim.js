@@ -106,13 +106,52 @@
 
   // Helper: map an .rpgsave filesystem path to its localStorage key.
   // Returns null if the path isn't a recognised save file pattern.
+  //
+  // `auto<ts>.rpgsave` is the DRM's autosave format (one file per
+  // autosave, timestamped). Mirror them into localStorage under
+  // "RPG Auto<ts>" so the DRM's Utils.{writeFile,readFile,exists,delete}
+  // round-trip them through the fs shim like normal save slots.
   function rpgsaveToStorageKey(p) {
     var ps = String(p);
     if (/global\.rpgsave$/i.test(ps)) return "RPG Global";
     if (/config\.rpgsave$/i.test(ps)) return "RPG Config";
     var m = ps.match(/file(\d+)\.rpgsave$/i);
     if (m) return "RPG File" + m[1];
+    var a = ps.match(/auto(\d+)\.rpgsave$/i);
+    if (a) return "RPG Auto" + a[1];
     return null;
+  }
+
+  // Enumerate auto-save files persisted in localStorage for the active
+  // save scope (mod-aware). Returns base filenames like "auto1234.rpgsave"
+  // the DRM's Utils._dirItems then statSyncs each entry to confirm it's
+  // a file. Without this, DataManager._autoSave's cleanup loop sees an
+  // empty directory and wipes the autoSaves dict on every map transfer.
+  function listAutoSaveFiles() {
+    var scope = "";
+    try {
+      var s = localStorage.getItem("_activeSaveScope");
+      if (s !== null) {
+        scope = s;
+      } else {
+        var mod = localStorage.getItem("_activeMod");
+        if (mod && mod.indexOf("translation_") !== 0) scope = mod;
+      }
+    } catch (e) {}
+    var prefix = (scope ? scope + ":" : "") + "RPG Auto";
+    var out = [];
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var key = localStorage.key(i);
+        if (!key || key.indexOf(prefix) !== 0) continue;
+        var rest = key.substring(prefix.length);
+        // rest must be just digits: guards against other-scope keys
+        // accidentally matching when scope is "".
+        if (!/^\d+$/.test(rest)) continue;
+        out.push("auto" + rest + ".rpgsave");
+      }
+    } catch (e) {}
+    return out;
   }
 
   // Helper: prefix a storage key with the active save scope (if any).
@@ -124,7 +163,7 @@
   // base game's scope (so French -> English doesn't orphan saves).
   //
   // lang-shim mirrors getActiveSaveScope() into localStorage under
-  // "_activeSaveScope":  "" means "no scope, use bare key":  so this
+  // "_activeSaveScope": "" means "no scope, use bare key": so this
   // module can do the translation-aware lookup without needing access
   // to the mods registry. Falls back to "_activeMod" when the scope key
   // is missing (legacy localStorage, or first paint before lang-shim
@@ -387,6 +426,122 @@
         }
       };
     }
+
+    // Uncap save slots; show max(50, saveCount + 5) in the save/load list.
+    // Stock DRM hardcodes maxSavefiles to 30 or 50 and Window_SavefileList
+    // derives its row count from it, so overriding maxSavefiles feeds both
+    // the slot allocator (selectSavefileForNewGame uses numSaves <
+    // maxSavefiles to pick the next id) and the visible UI.
+    if (
+      typeof DataManager !== "undefined" &&
+      typeof StorageManager !== "undefined"
+    ) {
+      var _saveCountCache = { value: -1, expires: 0 };
+      // Use the highest occupied slot (not the count) so sparse layouts
+      // e.g. a save at slot 50 with only a handful of others: keep the
+      // top slot visible plus 5 empty rows above it for the multi-import
+      // path to land on.
+      var _highestSaveSlot = function () {
+        var now = Date.now();
+        if (_saveCountCache.value >= 0 && now < _saveCountCache.expires) {
+          return _saveCountCache.value;
+        }
+        var top = 0;
+        try {
+          var json = StorageManager.load(0);
+          if (json) {
+            var info = JSON.parse(json);
+            if (info && info.length) {
+              for (var i = 1; i < info.length; i++) {
+                if (info[i] && StorageManager.exists(i) && i > top) top = i;
+              }
+            }
+          }
+        } catch (e) {}
+        _saveCountCache.value = top;
+        _saveCountCache.expires = now + 250;
+        return top;
+      };
+      // Read globalInfo directly via StorageManager.load(0): stock
+      // loadGlobalInfo itself iterates 1..maxSavefiles() to clean stale
+      // entries, so reading it here would be a recursion trap.
+      DataManager.maxSavefiles = function () {
+        return Math.max(50, _highestSaveSlot() + 5);
+      };
+      // Invalidate the cache the moment a slot is written or deleted so
+      // the next refresh of the save list reflects the new top slot.
+      // StorageManager.save is hooked too because the import path writes
+      // through it directly instead of going via DataManager.saveGame.
+      if (typeof StorageManager.save === "function") {
+        var _drm_smSave = StorageManager.save;
+        StorageManager.save = function (id) {
+          var r = _drm_smSave.apply(this, arguments);
+          _saveCountCache.value = -1;
+          return r;
+        };
+      }
+      if (typeof StorageManager.remove === "function") {
+        var _drm_remove = StorageManager.remove;
+        StorageManager.remove = function (id) {
+          var r = _drm_remove.apply(this, arguments);
+          _saveCountCache.value = -1;
+          return r;
+        };
+      }
+    }
+
+    // Cap auto-saves at ConfigManager.autoSaves (the user's option), not
+    // the DRM's hardcoded autoSaveMax() of 5. Without this, lowering the
+    // option past 5 leaves orphan auto<ts>.rpgsave entries on disk: visible
+    // count = min(config, files.length) but the file list keeps growing
+    // up to 5. The replacement mirrors the DRM's _autoSave verbatim and
+    // only swaps the cap; the rest of the engine (autoSaveMax, the options
+    // menu's clamp upper bound) is untouched so the slider still scrolls
+    // 0..5.
+    if (
+      typeof DataManager !== "undefined" &&
+      typeof DataManager._autoSave === "function" &&
+      typeof Utils !== "undefined" &&
+      typeof App !== "undefined"
+    ) {
+      DataManager._autoSave = function () {
+        var cap = (ConfigManager && ConfigManager.autoSaves) || 0;
+        if (cap < 1) return;
+        $gameSystem.onBeforeSave();
+        var dataPath = App.dataPath();
+        var fname = "auto" + Date.now() + ".rpgsave";
+        var fpath = Utils.join(dataPath, fname);
+        var contents = JsonEx.stringify(this.makeSaveContents());
+        var payload = LZString.compressToBase64(contents);
+        if (!Utils.writeFile(fpath, payload)) return;
+        var autos = [];
+        var entries = Utils.files(dataPath) || [];
+        for (var i = 0; i < entries.length; i++) {
+          var name = entries[i];
+          var lower = name.toLowerCase();
+          if (
+            lower.indexOf("auto") === 0 &&
+            lower.lastIndexOf(".rpgsave") === lower.length - 8
+          ) {
+            autos.push(name);
+          }
+        }
+        this.sortDesc(autos);
+        while (autos.length > cap) {
+          Utils.delete(Utils.join(dataPath, autos.pop()));
+        }
+        var nextDict = {};
+        var prevDict = this.globalGet("autoSaves", {});
+        prevDict[fname] = this.makeSavefileInfo();
+        for (var j = 0; j < autos.length; j++) {
+          var key = autos[j];
+          nextDict[key] = prevDict.hasOwnProperty(key)
+            ? prevDict[key]
+            : this.recoveryMeta();
+        }
+        this.globalSet("autoSaves", nextDict);
+      };
+    }
   };
 
   // String version of the overrides for appending to zlib-decompressed
@@ -463,7 +618,13 @@
               var sk = rpgsaveToStorageKey(ps);
               return sk ? !!localStorage.getItem(modAwareKey(sk)) : false;
             }
-            // .settings -> not in browser
+            // config.settings -> the DRM's ConfigManager persists options
+            // here via Utils.writeFile, not via StorageManager. Treat it
+            // like a save key so options round-trip through localStorage.
+            if (/config\.settings$/i.test(ps)) {
+              return !!localStorage.getItem(modAwareKey("RPG Settings"));
+            }
+            // Other .settings files -> not in browser
             if (/\.settings$/i.test(ps)) return false;
             // Block dialogue.txt / dialogue.csv custom-overlay probes: the
             // merged CLD (served via dialogue.loc) already contains the
@@ -524,7 +685,17 @@
               }
               return null;
             }
-            // .settings / app-data dir: not available in browser
+            // config.settings -> read from localStorage (DRM's ConfigManager
+            // stores options here via Utils.readFile/writeFile, bypassing
+            // StorageManager). Utils.readFile passes encoding='utf-8', so
+            // the DRM expects a string back.
+            if (/config\.settings$/i.test(ps)) {
+              var sd = localStorage.getItem(modAwareKey("RPG Settings"));
+              if (sd == null) return null;
+              if (encoding) return sd;
+              return window.Buffer.from(sd, "utf8");
+            }
+            // Other .settings / app-data dir: not available in browser
             if (
               /\.settings$/i.test(ps) ||
               ps.indexOf("CoffinAndyLeyley") !== -1
@@ -557,19 +728,24 @@
             return "";
           },
           writeFileSync: function (p, data) {
-            // .rpgsave -> mirror to localStorage
             var ps = String(p || "");
+            var val =
+              typeof data === "string"
+                ? data
+                : data && data.toString
+                  ? data.toString("utf8")
+                  : "";
+            // .rpgsave -> mirror to localStorage
             if (/\.rpgsave$/i.test(ps)) {
               var sk = rpgsaveToStorageKey(ps);
-              if (sk) {
-                var val =
-                  typeof data === "string"
-                    ? data
-                    : data && data.toString
-                      ? data.toString("utf8")
-                      : "";
-                localStorage.setItem(modAwareKey(sk), val);
-              }
+              if (sk) localStorage.setItem(modAwareKey(sk), val);
+              return;
+            }
+            // config.settings -> the DRM's ConfigManager.save writes here.
+            // Persist under "RPG Settings" (scope-aware) so the options
+            // menu round-trips between sessions.
+            if (/config\.settings$/i.test(ps)) {
+              localStorage.setItem(modAwareKey("RPG Settings"), val);
             }
           },
           mkdirSync: function () {},
@@ -597,8 +773,12 @@
               throw err;
             }
             // Use file extension to determine type:
-            // paths with extensions are files, others are directories
-            var hasExt = /\.[a-z0-9]{1,6}$/i.test(String(p));
+            // paths with extensions are files, others are directories.
+            // Allow up to 10 chars so .rpgsave / .settings still register
+            // as files: Utils._dirItems filters readdir results through
+            // statSync(...).isFile(), so capping at 6 chars hid every
+            // auto*.rpgsave from the DRM's autosave cleanup loop.
+            var hasExt = /\.[a-z0-9]{1,10}$/i.test(String(p));
             return {
               isDirectory: function () {
                 return !hasExt;
@@ -623,6 +803,14 @@
             if (/languages\/[^/]+\/?$/i.test(np)) {
               return ["dialogue.loc"];
             }
+            // App data directory: DRM enumerates auto*.rpgsave here for
+            // cleanup, recovery, and the savefile list. The path comes
+            // from App.dataPath() which is `process.env.APPDATA/CoffinAndyLeyley`
+            // in browser-shim process.env is empty so the prefix collapses
+            // away, but the APPDATA_DIR segment is the stable marker.
+            if (/CoffinAndyLeyley/i.test(np) && !/\/Logs\b/i.test(np)) {
+              return listAutoSaveFiles();
+            }
             return [];
           },
           unlinkSync: function (p) {
@@ -630,6 +818,10 @@
             if (/\.rpgsave/i.test(ps)) {
               var sk = rpgsaveToStorageKey(ps);
               if (sk) localStorage.removeItem(modAwareKey(sk));
+              return;
+            }
+            if (/config\.settings$/i.test(ps)) {
+              localStorage.removeItem(modAwareKey("RPG Settings"));
             }
           },
           accessSync: function () {},

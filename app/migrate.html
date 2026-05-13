@@ -16,7 +16,7 @@
         padding: 0;
         height: 100%;
         font-family: Georgia, serif;
-        /* Default cursor:  this page has no canvas overriding it. */
+        /* Default cursor: this page has no canvas overriding it. */
         cursor: default;
       }
       body {
@@ -450,7 +450,7 @@
         if (typeof key !== "string") return false;
         var parts = splitKey(key);
         if (parts.scope === "") return SAVE_KIND_RE.test(parts.bare);
-        // Only consider translation_*-prefixed keys:  overhaul mod saves
+        // Only consider translation_*-prefixed keys: overhaul mod saves
         // (e.g. TCOAAR:RPG File1) live in their own scope and must not be
         // touched by this migration.
         return (
@@ -674,7 +674,7 @@
         Object.keys(combined).forEach(function (key) {
           var parts = splitKey(key);
           var bucket = scopes[parts.scope];
-          if (!bucket) return; // overhaul scope or unknown:  skip
+          if (!bucket) return; // overhaul scope or unknown: skip
           var value = combined[key];
           var bare = parts.bare;
           if (bare === "RPG Global") {
@@ -857,12 +857,12 @@
       // A narrower pattern: translation-scoped RPG Global keys only.
       // Translation mods share the base game's save scope (see
       // lang-shim.js:getActiveSaveScope), so any translation_<id>:RPG Global
-      // entry is unreachable:  the engine never reads it. They are safe to
+      // entry is unreachable: the engine never reads it. They are safe to
       // drop unconditionally as soon as the user commits to the migration,
       // regardless of whether the file-merge step that follows succeeds. We
       // keep this distinct from the broader post-merge sweep because the
       // sweep also touches file saves (RPG File\d+(bak)?), which must NOT
-      // be dropped on a failed merge:  they are still the user's only copy.
+      // be dropped on a failed merge: they are still the user's only copy.
       var TRANSLATION_GLOBAL_KEY_RE = /^translation_[^:]+:RPG Global$/;
 
       function purgeTranslationKeysLS() {
@@ -1028,7 +1028,7 @@
         });
       }
 
-      // Same one-shot SFX helper as lock.html:  best-effort autoplay,
+      // Same one-shot SFX helper as lock.html: best-effort autoplay,
       // falls back to first-pointer-down if the browser blocks. Silent on
       // any failure (missing assets, codec issue, etc.).
       var MIGRATE_SFX = "audio/se/e4b12af62524a5fe.ogg";
@@ -1149,11 +1149,11 @@
         // Drop translation_<id>:RPG Global from LS and IDB *before* the
         // file merge runs. Translation mods are transparent for saves
         // (lang-shim's getActiveSaveScope returns null for them), so these
-        // globals are dead data the engine never reads:  safe to remove
+        // globals are dead data the engine never reads: safe to remove
         // regardless of whether the merge succeeds. Doing it here means
         // an early bail-out below still leaves the user with no orphan
         // translation globals around to re-trigger migration next boot.
-        // We do NOT touch RPG File\d+ keys here:  they remain the user's
+        // We do NOT touch RPG File\d+ keys here: they remain the user's
         // only copy of those saves until commitMerge* writes the merged
         // versions to the base scope.
         try {
@@ -1169,14 +1169,14 @@
         } catch (e) {
           console.error("[migrate] merge failed:", e);
           setStatus(
-            "Merge failed. Refresh the page to try again:  original saves are still in place.",
+            "Merge failed. Refresh the page to try again: original saves are still in place.",
             true,
           );
           setErrDetail(String((e && e.stack) || e));
           return;
         }
 
-        // Final sweep:  drop any lingering translation_<id>:* keys from
+        // Final sweep: drop any lingering translation_<id>:* keys from
         // LS/IDB. The targeted merge above relies on SAVE_KIND_RE; this
         // catches stragglers (bak-only files with no primary, legacy
         // shapes from older builds) so the bootstrap in index.html
@@ -1189,7 +1189,7 @@
         }
 
         // Mark migration complete. The bootstrap in index.html consults
-        // this flag:  with it set, any straggler translation_<id>:* key
+        // this flag: with it set, any straggler translation_<id>:* key
         // is dropped silently instead of re-triggering this page. Without
         // it, the user would loop back here on every boot if even one
         // orphan survived. `localStorage.clear()` (in the loader's reset

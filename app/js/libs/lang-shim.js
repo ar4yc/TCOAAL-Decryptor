@@ -153,7 +153,9 @@
     return (
       bare === "RPG Global" ||
       bare === "RPG Config" ||
-      /^RPG File\d+$/.test(bare)
+      bare === "RPG Settings" ||
+      /^RPG File\d+$/.test(bare) ||
+      /^RPG Auto\d+$/.test(bare)
     );
   }
 
@@ -232,7 +234,7 @@
   // its own page (/migrate.html). index.html redirects to it on boot when
   // it spots any translation_*-prefixed save key, so by the time we reach
   // this routine all keys are in canonical (unprefixed or overhaul-prefixed)
-  // form:  nothing for this code to special-case.
+  // form: nothing for this code to special-case.
   function restoreSavesFromIDB() {
     openSaveDb(function (db) {
       if (!db) {
@@ -527,8 +529,8 @@
   // any DRM init code that reads/writes saves uses the correct mod prefix.
   // Without this, the DRM can capture the stock webStorageKey and operate
   // on unprefixed keys while our post-boot code uses prefixed keys.
-  // Gate on getActiveSaveScope (not _activeMod) so translation mods:  which
-  // share the base game's save scope:  leave the stock webStorageKey alone.
+  // Gate on getActiveSaveScope (not _activeMod) so translation mods: which
+  // share the base game's save scope: leave the stock webStorageKey alone.
   if (getActiveSaveScope() && typeof StorageManager !== "undefined") {
     var _iife_orig_webStorageKey = StorageManager.webStorageKey;
     StorageManager.webStorageKey = function (savefileId) {
@@ -596,7 +598,7 @@
   }
 
   // Replace the stock _setupEventHandlers for two reasons:
-  //   1. {passive: false} on the wheel listener:  Chrome treats document-level
+  //   1. {passive: false} on the wheel listener: Chrome treats document-level
   //      wheel listeners as passive by default, blocking _onWheel's
   //      preventDefault() and spamming the console on every scroll.
   //   2. Indirect-lookup wrappers (instead of .bind(this)) so later plugin
@@ -1363,7 +1365,7 @@
     // proportionally, so layouts remain centered without further work.
     // Window_ModList sizes itself from a fixed maxVisibleItems and is
     // unaffected. Selectable lists (save slots, item/skill lists) keep
-    // their stock sizing:  they're already large enough to tap.
+    // their stock sizing: they're already large enough to tap.
     if (_isMobile && typeof Window_Command !== "undefined") {
       Window_Command.prototype.lineHeight = function () {
         return 54;
@@ -1449,7 +1451,7 @@
       // Tag every new save payload with the save-scope mod id so cross-mod
       // imports can be rejected. Native desktop saves won't carry this tag;
       // absence is treated as "base game" with a filename-prefix fallback.
-      // Translation mods deliberately do NOT contribute a tag:  they share
+      // Translation mods deliberately do NOT contribute a tag: they share
       // the base game's save scope, so a save made under French and one
       // made under English must be freely interchangeable.
       // `_modId` lives alongside system/screen/etc. in the contents object.
@@ -1618,6 +1620,49 @@
         return "the '" + name + "' mod";
       }
 
+      // Build savefile info from parsed contents without loading the save:
+      // the imported slot can show character portraits and playtime
+      // immediately, instead of "Unknown" until next reload.
+      //
+      // The portraits and playtime come from `$gameParty` and `$gameSystem`.
+      // Both are pulled from `contents` (rehydrated by JsonEx with their
+      // real prototypes), so we briefly swap them into the globals,
+      // call `DataManager.makeSavefileInfo`, and restore.
+      //
+      // The DRM derives playtime from `_secondsPlayed`. Legacy saves only
+      // have `_framesOnSave`; mirror the DRM's loadGame conversion so the
+      // playtime renders correctly for both shapes.
+      function makeInfoFromContents(contents) {
+        if (
+          !contents ||
+          !contents.system ||
+          !contents.party ||
+          !contents.actors
+        ) {
+          return null;
+        }
+        if (typeof contents.system._secondsPlayed !== "number") {
+          contents.system._secondsPlayed =
+            (contents.system._framesOnSave || 0) / 60;
+        }
+        var prevSystem = window.$gameSystem;
+        var prevParty = window.$gameParty;
+        var prevActors = window.$gameActors;
+        try {
+          window.$gameSystem = contents.system;
+          window.$gameParty = contents.party;
+          window.$gameActors = contents.actors;
+          return DataManager.makeSavefileInfo();
+        } catch (e) {
+          console.warn("[lang-shim] makeInfoFromContents failed:", e);
+          return null;
+        } finally {
+          window.$gameSystem = prevSystem;
+          window.$gameParty = prevParty;
+          window.$gameActors = prevActors;
+        }
+      }
+
       // Extract the origin mod id from an imported save. Prefers the
       // payload tag; falls back to filename prefix against known mod keys.
       // Returns a mod id string or null (= base game / translation scope).
@@ -1639,98 +1684,168 @@
         return null;
       }
 
-      // Import: load a save file into an empty slot. Accepts:
+      // Import: load one or more save files. Accepts:
       //   - .rpgsave (native RPG Maker MV: LZString base64 of the JSON payload)
       //   - .json    (legacy web export: { savefileId, info, data } wrapper)
       // Format is detected from content, not extension. Rejects imports
       // whose origin (base game vs mod) does not match the active context.
-      // Occupancy check uses StorageManager.exists, not isThisGameFile: the
+      //
+      // Multi-file: the hovered slot is the starting cursor. The first
+      // empty slot at or after that cursor receives the first file; each
+      // subsequent file lands on the next empty slot beyond the previous
+      // one. Occupied slots are NEVER overwritten: they are skipped.
+      // Occupancy uses StorageManager.exists, not isThisGameFile: the
       // DRM-overridden isThisGameFile stays "true" after a delete until reload.
       Scene_File.prototype._handleSaveImport = function (savefileId) {
-        if (StorageManager.exists(savefileId)) {
-          SoundManager.playBuzzer();
-          return;
-        }
         var self = this;
         var input = document.createElement("input");
         input.type = "file";
         input.accept = ".rpgsave,.json";
+        input.multiple = true;
         input.style.display = "none";
         input.addEventListener("change", function () {
-          if (!input.files || !input.files[0]) return;
-          var file = input.files[0];
-          var filename = file.name || "";
-          var reader = new FileReader();
-          reader.onload = function (e) {
-            try {
-              var raw = (e.target.result || "").toString().trim();
+          var files = input.files
+            ? Array.prototype.slice.call(input.files)
+            : [];
+          if (files.length === 0) return;
+
+          // Read all files in parallel so slot assignment runs in a single
+          // synchronous pass: otherwise sequential async writes race on
+          // the globalInfo blob and the second import overwrites the first.
+          var readers = files.map(function (file) {
+            return new Promise(function (resolve) {
+              var r = new FileReader();
+              r.onload = function (e) {
+                resolve({
+                  name: file.name || "",
+                  raw: (e.target.result || "").toString().trim(),
+                });
+              };
+              r.onerror = function () {
+                resolve({ name: file.name || "", raw: null });
+              };
+              r.readAsText(file);
+            });
+          });
+
+          Promise.all(readers).then(function (results) {
+            var currentModId = getActiveSaveScope() || null;
+            // Slots already taken in this batch: combined with
+            // StorageManager.exists so we never overwrite anything.
+            var batchTaken = {};
+            var nextFreeSlot = function (start) {
+              var s = Math.max(1, start | 0);
+              while (StorageManager.exists(s) || batchTaken[s]) s++;
+              return s;
+            };
+
+            var imported = 0;
+            var failed = []; // bad/unreadable/non-save files
+            var rejectedByOrigin = []; // name -> source mod label
+            var cursor = savefileId;
+
+            for (var i = 0; i < results.length; i++) {
+              var r = results[i];
+              if (!r.raw) {
+                failed.push(r.name);
+                continue;
+              }
               var json = null;
               var importedInfo = null;
-              if (raw.charAt(0) === "{") {
-                // Legacy wrapped JSON export
-                var parsed = JSON.parse(raw);
-                if (!parsed || !parsed.data) {
-                  SoundManager.playBuzzer();
-                  return;
+              try {
+                if (r.raw.charAt(0) === "{") {
+                  var parsed = JSON.parse(r.raw);
+                  if (!parsed || !parsed.data) {
+                    failed.push(r.name);
+                    continue;
+                  }
+                  json = parsed.data;
+                  importedInfo = parsed.info || null;
+                } else {
+                  json = LZString.decompressFromBase64(r.raw);
                 }
-                json = parsed.data;
-                importedInfo = parsed.info || null;
-              } else {
-                // .rpgsave: native LZString base64 payload
-                json = LZString.decompressFromBase64(raw);
+                if (!json) {
+                  failed.push(r.name);
+                  continue;
+                }
+                var contents = JsonEx.parse(json);
+                if (!contents) {
+                  failed.push(r.name);
+                  continue;
+                }
+
+                var saveModId = detectSaveOrigin(contents, r.name);
+                if (saveModId !== currentModId) {
+                  rejectedByOrigin.push({
+                    name: r.name,
+                    src: modDisplayName(saveModId),
+                  });
+                  continue;
+                }
+
+                var slot = nextFreeSlot(cursor);
+                StorageManager.save(slot, json);
+                var globalInfo = DataManager.loadGlobalInfo() || [];
+                if (importedInfo) {
+                  importedInfo.timestamp = Date.now();
+                  globalInfo[slot] = importedInfo;
+                } else {
+                  // Native .rpgsave has no info wrapper. Derive it from the
+                  // parsed save data so the slot shows character / playtime
+                  // immediately, instead of "Unknown" until next reload.
+                  globalInfo[slot] = makeInfoFromContents(contents) || {
+                    globalId: DataManager._globalId,
+                    title: $dataSystem.gameTitle,
+                    characters: [],
+                    faces: [],
+                    playtime: "00:00:00",
+                    timestamp: Date.now(),
+                  };
+                }
+                DataManager.saveGlobalInfo(globalInfo);
+                batchTaken[slot] = true;
+                cursor = slot + 1;
+                imported++;
+              } catch (ex) {
+                console.error("[lang-shim] Save import failed for", r.name, ex);
+                failed.push(r.name);
               }
-              if (!json) {
-                SoundManager.playBuzzer();
-                return;
-              }
-              // Validate the save data parses correctly
-              var contents = JsonEx.parse(json);
-              if (!contents) {
-                SoundManager.playBuzzer();
-                return;
-              }
-              // Origin check: block cross-context imports (base <-> overhaul,
-              // overhaul <-> overhaul). Translations share the base game's
-              // save scope, so compare on save scope rather than active mod.
-              var saveModId = detectSaveOrigin(contents, filename);
-              var currentModId = getActiveSaveScope() || null;
-              if (saveModId !== currentModId) {
-                SoundManager.playBuzzer();
-                var src = modDisplayName(saveModId);
-                self._showSaveInfoPopup([
-                  "Cannot import. Save is from " + src + ".",
-                  "Switch to " + src + " to import it.",
-                ]);
-                return;
-              }
-              // Write the save data
-              StorageManager.save(savefileId, json);
-              // Update global info
-              var globalInfo = DataManager.loadGlobalInfo() || [];
-              if (importedInfo) {
-                // Use the exported info but update timestamp
-                importedInfo.timestamp = Date.now();
-                globalInfo[savefileId] = importedInfo;
-              } else {
-                // .rpgsave has no info wrapper: synthesize a minimal entry
-                globalInfo[savefileId] = {
-                  globalId: DataManager._globalId,
-                  title: $dataSystem.gameTitle,
-                  characters: [],
-                  faces: [],
-                  playtime: "Unknown",
-                  timestamp: Date.now(),
-                };
-              }
-              DataManager.saveGlobalInfo(globalInfo);
+            }
+
+            if (imported > 0) {
               SoundManager.playLoad();
               self._listWindow.refresh();
-            } catch (ex) {
-              console.error("[lang-shim] Save import failed:", ex);
+            } else {
               SoundManager.playBuzzer();
             }
-          };
-          reader.readAsText(file);
+
+            // Summary popup only when something needs explaining: a wrong-
+            // origin file or an unreadable file. Silent on full success.
+            if (rejectedByOrigin.length > 0 || failed.length > 0) {
+              var lines = [];
+              if (imported > 0) {
+                lines.push("Imported " + imported + " save(s).");
+              }
+              if (rejectedByOrigin.length > 0) {
+                // Group rejections by source so the message stays short
+                // even when the user dropped a whole folder of mismatches.
+                var bySrc = {};
+                rejectedByOrigin.forEach(function (e) {
+                  bySrc[e.src] = (bySrc[e.src] || 0) + 1;
+                });
+                Object.keys(bySrc).forEach(function (src) {
+                  lines.push(
+                    "Skipped " + bySrc[src] + " save(s) from " + src + ".",
+                  );
+                });
+                lines.push("Switch context to import them.");
+              }
+              if (failed.length > 0) {
+                lines.push("Skipped " + failed.length + " unreadable file(s).");
+              }
+              self._showSaveInfoPopup(lines);
+            }
+          });
         });
         document.body.appendChild(input);
         input.click();

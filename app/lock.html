@@ -200,7 +200,7 @@
       }
 
       function fetchLock() {
-        // cache: no-store + cachebuster query:  defeat both the browser HTTP
+        // cache: no-store + cachebuster query: defeat both the browser HTTP
         // cache and any intermediate CDN cache. The SW also no-stores this
         // path (see sw.js infrastructure list).
         var url = LOCK_URL + "?_=" + Date.now();
@@ -373,7 +373,7 @@
           $hero.removeAttribute("src");
           return;
         }
-        // The image only renders if it actually loads:  the SW serves it
+        // The image only renders if it actually loads: the SW serves it
         // from IDB when the user has imported game assets, otherwise the
         // request 404s and we just keep the element hidden. When `crop`
         // is true (the default) we additionally trim a tight bounding
@@ -485,7 +485,7 @@
         $splash.hidden = true;
         $title.textContent = lock.title || "TCOAAL";
         renderText(lock.text || "");
-        // cropImage defaults to true:  only an explicit `false` disables.
+        // cropImage defaults to true: only an explicit `false` disables.
         var crop = lock.cropImage !== false;
         maybeShowImage(lock.image, crop);
         renderLinks(lock.buttons);
@@ -520,7 +520,7 @@
               if (lock.type === "partial") {
                 return readDismissed(db).then(function (ids) {
                   if (ids.indexOf(lock.id || "default") >= 0) {
-                    // Already acknowledged:  fast-path back.
+                    // Already acknowledged: fast-path back.
                     goBack();
                     return;
                   }
@@ -531,7 +531,7 @@
                 showLock(lock, db);
                 return;
               }
-              // Unknown type:  fail open rather than trap the user.
+              // Unknown type: fail open rather than trap the user.
               goBack();
             });
           })

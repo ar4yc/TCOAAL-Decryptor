@@ -1673,7 +1673,7 @@
           });
           // Force a re-fetch of sw.js to pick up any newer version.
           // skipWaiting + clients.claim in the new SW ensure it takes
-          // control. We don't await this:  on first-ever install the
+          // control. We don't await this: on first-ever install the
           // returned promise can resolve before the page is actually
           // controlled, and we'd rather block on the controllerchange
           // signal below than on the update check itself.
@@ -1682,10 +1682,10 @@
           // Already controlled? Nothing more to wait for.
           if (navigator.serviceWorker.controller) return;
 
-          // First-time install:  wait for a controller. There's a race
+          // First-time install: wait for a controller. There's a race
           // where the SW can claim the page between the check above and
           // addEventListener below  -  so we re-check inside the
-          // listener-bound promise. And we cap the wait at 8s:  if the
+          // listener-bound promise. And we cap the wait at 8s: if the
           // SW never claims (extension blockers, broken activate), the
           // page still works (fetches just fall through to network),
           // so hanging the loader UI forever is the wrong default.
@@ -1731,7 +1731,7 @@
       // We parse the End-of-Central-Directory record, walk the central
       // directory, and return per-entry descriptors. Decompression is
       // deferred (lazy) so we don't materialise every entry's bytes
-      // upfront:  storeFiles() iterates sequentially and frees each
+      // upfront: storeFiles() iterates sequentially and frees each
       // buffer after putAsset.
       var ZIP_EOCD_SIG = 0x06054b50;
       var ZIP_CD_SIG = 0x02014b50;
@@ -1775,7 +1775,7 @@
           );
         }
 
-        // Filename decoder:  assume UTF-8 (modern archivers use the bit-11
+        // Filename decoder: assume UTF-8 (modern archivers use the bit-11
         // flag for UTF-8; older archivers default to CP437 but UTF-8 is a
         // safe superset for ASCII paths, which TCOAAL filenames are).
         const decoder = new TextDecoder("utf-8", { fatal: false });
@@ -1828,7 +1828,7 @@
         ) {
           throw new Error("Corrupt ZIP local header for " + entry.name + ".");
         }
-        // Local header has its own name/extra lengths:  they CAN differ
+        // Local header has its own name/extra lengths: they CAN differ
         // from the central directory copy (extra fields often do), so we
         // read them again here.
         const lfhNameLen = view.getUint16(off + 26, true);
@@ -2098,10 +2098,13 @@
       // Save export
       //
       // RPG Maker MV writes saves to localStorage under the keys
-      // "RPG File<n>", "RPG Global", "RPG Config". When a mod is active
-      // StorageManager.webStorageKey prefixes them with "<modId>:" so
-      // saves are isolated per mod (see lang-shim.js). Match both forms.
-      var SAVE_KEY_RE = /(?:^|:)RPG (?:File\d+|Global|Config)$/;
+      // "RPG File<n>", "RPG Global", "RPG Config". The DRM also writes
+      // "RPG Auto<timestamp>" entries for each autosave (mirrors the
+      // auto<ts>.rpgsave files the desktop build would write to disk).
+      // When a mod is active StorageManager.webStorageKey prefixes them
+      // with "<modId>:" so saves are isolated per mod (see lang-shim.js).
+      // Match both forms.
+      var SAVE_KEY_RE = /(?:^|:)RPG (?:File\d+|Global|Config|Auto\d+)$/;
 
       // Show/hide the "Export save files" button in the manage panel
       // based on whether any saves currently exist in localStorage.
@@ -2139,7 +2142,7 @@
         return out;
       }
 
-      // CRC32 (IEEE 802.3 polynomial):  required by the ZIP file format
+      // CRC32 (IEEE 802.3 polynomial): required by the ZIP file format
       // for every entry, even STORED ones.
       var CRC_TABLE = (function () {
         const t = new Uint32Array(256);
@@ -2245,11 +2248,12 @@
       }
 
       // Translate a localStorage save key into its archive path.
-      //   "RPG File1"           -> "file1.rpgsave"
-      //   "RPG Global"          -> "global.rpgsave"
-      //   "RPG Config"          -> "config.rpgsave"
-      //   "TCOAAR:RPG File1"    -> "TCOAAR/file1.rpgsave"
-      //   "TCOAAR:RPG Global"   -> "TCOAAR/global.rpgsave"
+      //   "RPG File1"               -> "file1.rpgsave"
+      //   "RPG Global"              -> "global.rpgsave"
+      //   "RPG Config"              -> "config.rpgsave"
+      //   "RPG Auto1775344095945"   -> "auto1775344095945.rpgsave"
+      //   "TCOAAR:RPG File1"        -> "TCOAAR/file1.rpgsave"
+      //   "TCOAAR:RPG Global"       -> "TCOAAR/global.rpgsave"
       // Base game saves live at the archive root; mod saves live in a
       // sub-folder named after the mod, so unzipping yields a clean tree.
       function saveBackupFilename(key) {
@@ -2261,7 +2265,7 @@
             ? key.substring(0, colonIdx).replace(/[/\\:]/g, "_") + "/"
             : "";
         const rest = colonIdx > 0 ? key.substring(colonIdx + 1) : key;
-        const m = rest.match(/^RPG (File\d+|Global|Config)$/);
+        const m = rest.match(/^RPG (File\d+|Global|Config|Auto\d+)$/);
         if (m) return modDir + m[1].toLowerCase() + ".rpgsave";
         // Fallback for any unexpected save-shaped key.
         return modDir + rest.replace(/[/\\:\s]/g, "_") + ".rpgsave";
@@ -2289,7 +2293,7 @@
           }));
 
           const zip = buildZip(files);
-          // Local-time date + hour (HHhMM):  sortable, unambiguous,
+          // Local-time date + hour (HHhMM): sortable, unambiguous,
           // and safe on all OSes (no colons, no dots).
           const d = new Date();
           const pad = (n) => String(n).padStart(2, "0");

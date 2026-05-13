@@ -8,7 +8,7 @@
  * patches TouchInput._setupEventHandlers to use indirect-lookup wrappers
  * (e.g. function (e) { TouchInput._onTouchStart(e); } instead of
  * this._onTouchStart.bind(this)), so reassigning these methods here at
- * plugin-load time takes effect on the live DOM listeners:  no need to
+ * plugin-load time takes effect on the live DOM listeners: no need to
  * re-register fresh listeners on top.
  */
 
@@ -87,7 +87,7 @@
   // touchmove / touchend are registered once by lang-shim.js's patched
   // TouchInput._setupEventHandlers, using indirect-lookup wrappers. The
   // method reassignments above (and on _onTouch* below) are picked up
-  // automatically:  registering fresh listeners here would just double-fire.
+  // automatically: registering fresh listeners here would just double-fire.
   //
   // Single-touch behavior is gesture-aware:
   //   tap                       -> click (advance message / select item)

@@ -183,7 +183,7 @@
         // screen at /lock.html; if enabled we redirect there before doing
         // anything else. Synchronous XHR is used so the splash never has
         // a chance to render the game UI. cache:no-store equivalent is
-        // achieved with the cachebuster query:  sync XHR doesn't honour
+        // achieved with the cachebuster query: sync XHR doesn't honour
         // fetch options. Partial locks are short-circuited locally via
         // a localStorage mirror written by lock.html on dismiss, so a
         // user who already acknowledged isn't bounced through lock.html
@@ -215,16 +215,16 @@
 
         // One-time translation-prefix save migration lives on its own page.
         // If any localStorage save key still carries a "translation_*:" prefix
-        // we hand off to /migrate.html before doing anything else:  that page
+        // we hand off to /migrate.html before doing anything else: that page
         // owns the backup-zip modal and the merge, and isn't fighting the
         // game's PIXI canvas / boot-splash / LOADING image for the screen.
         // location.replace keeps it out of session history.
         //
         // After a successful migration migrate.html sets the flag
         // `_migration_translation_done`. With that flag present we never
-        // redirect again:  any straggler translation_<id>:* key is silently
+        // redirect again: any straggler translation_<id>:* key is silently
         // dropped (it can only be an orphan that slipped past the merge's
-        // sweep:  it would otherwise re-trigger this redirect on every
+        // sweep: it would otherwise re-trigger this redirect on every
         // boot, which is exactly the regression the flag is here to stop).
         try {
           var _migrationDone = false;
@@ -261,7 +261,7 @@
             }
             // Mirror the LS purge into tcoaal-saves so a future
             // restoreSavesFromIDB pass can't bring the stragglers back.
-            // Best-effort and async:  failures are silently ignored, since
+            // Best-effort and async: failures are silently ignored, since
             // the LS purge above already addresses the user-visible symptom
             // (the loader export reads LS only).
             try {
