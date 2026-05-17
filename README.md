@@ -11,8 +11,3 @@ Created by Kidev as a fan tool for the community.<br/>
 Forked and developed by Axell (current decryptor).
 
 Some assets, theme and inspiration by **Nemlei**
-
-Faustina font by Google.
-
-[pako](https://github.com/nodeca/pako) by nodeca.
-
